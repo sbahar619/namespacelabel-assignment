@@ -21,7 +21,7 @@ Various ways could achieve this functionality. Please go ahead and get creative.
 An example of a NamespaceLabel CR: 
 
 ```
-apiVersion: dana.io.dana.io/v1alpha1
+apiVersion: namespacelabel.dana.io/v1alpha1
 kind: NamespaceLabel
 metadata:
     name: namespacelabel-sample
