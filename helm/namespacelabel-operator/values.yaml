@@ -1,0 +1,39 @@
+# Image configuration
+image:
+  repository: manager
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Namespace configuration
+namespace:
+  name: namespacelabel-system
+
+# Resource limits
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+# Protection configuration
+protection:
+  patterns:
+    - "kubernetes.io/*"
+    - "*.k8s.io/*"
+    - "istio.io/*"
+    - "pod-security.kubernetes.io/*"
+  mode: "fail"
+
+# Webhook configuration
+webhook:
+  port: 9443
+
+# Metrics configuration
+metrics:
+  port: 8080
+
+# Health probe configuration
+health:
+  port: 8081
