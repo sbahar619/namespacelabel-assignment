@@ -4,15 +4,16 @@ on:
   workflow_run:
     workflows: ["Test"]
     types: [completed]
-    branches: [main, develop]  # Only run E2E for main/develop branches
+    branches: [main, develop, namespacelabel-operator]  # Only run E2E for main/develop/namespacelabel-operator branches
   push:
-    branches: [main, develop]  # Direct pushes to main/develop (no PR)
+    branches: [main, develop, namespacelabel-operator]  # Direct pushes to main/develop/namespacelabel-operator (no PR)
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
   pull_request:  # Run E2E tests on PRs
+    branches: [ main, develop, namespacelabel-operator ]
     types: [opened, synchronize, reopened]
     paths-ignore:
       - '**.md'
