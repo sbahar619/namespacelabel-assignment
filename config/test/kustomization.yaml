@@ -1,0 +1,11 @@
+resources:
+- ../default
+
+images:
+- name: manager
+  newName: manager
+  newTag: latest
+
+# Set the manager image in the controller deployment
+patchesStrategicMerge:
+- manager_image_patch.yaml 

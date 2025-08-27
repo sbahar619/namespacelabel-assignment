@@ -1,55 +1,223 @@
-# Home Assignment
+# NamespaceLabel Operator
 
-When operating a large multi-tenant Kubernetes cluster, tenants are usually isolated by Namespaces and Role Base Access Control (RBAC).
-This approach limits the permissions tenant have on the Namespace object they use to deploy their applications.
-Some tenants would like to set specific labels on their Namespace; however, they cannot edit it.
-As operators, we came up with the idea of creating a Custom Resource Definition (CRD), which will allow tenants to edit their
-Namespace's labels.
+Kubernetes operator for managing namespace labels with protection patterns.
 
-**Please make sure you have a basic understanding of the following concepts before you continue to read.**
-- [Controller](https://kubernetes.io/docs/concepts/architecture/controller/) 
-- [Custom Resource Definition (CRD)](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
-- [Operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) 
-- [Kubebuilder](https://book.kubebuilder.io)
-- [Operator-SDK](https://sdk.operatorframework.io/docs/)
+## 🚀 Quick Start
 
-## NamespaceLabel Operator
+### Install & Deploy
 
-This operator should be reasonably straightforward. It should sync between the NamespaceLabel CRD and the Namespace Labels.
-Various ways could achieve this functionality. Please go ahead and get creative. However, even a simple working solution is good.
+```bash
+# Quick install from releases (certificates auto-generated)
+kubectl apply -f https://github.com/dana-team/namespacelabel/releases/latest/download/install.yaml
+./hack/generate-webhook-certs.sh
 
-An example of a NamespaceLabel CR: 
+# Or deploy with default images
+make deploy
 
+# Or deploy with custom image
+make deploy MANAGER_IMG=your-registry/namespacelabel-manager:tag
 ```
-apiVersion: namespacelabel.dana.io/v1alpha1
+
+### Create a NamespaceLabel
+```bash
+kubectl apply -f - <<EOF
+apiVersion: labels.shahaf.com/v1alpha1
 kind: NamespaceLabel
 metadata:
-    name: namespacelabel-sample
-    namespace: default
+  name: labels
+  namespace: my-app
 spec:
-    labels:
-        label_1: a
-        label_2: b
-        label_3: c
+  labels:
+    environment: production
+    team: backend
+    tier: critical
+EOF
 ```
 
-### Things to address
+## 🛡️ Label Protection
 
-- Can you create/update/delete labels?
-- Can you deal with more than one NamespaceLabel object per Namespace? If not, solve it.
-- Namespaces usually have [labels for management](https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/), can you protect those labels?
-- Tenant is not able to consume CRDs by default, what needs to be done to let tenant use the NamespaceLabel CRD?
-- Code should be documented, tested (unit testing) and well-written.
+Protect important labels from being overwritten:
 
-## Tools you should use
-This repo contains a go project you can fork it and use it as a template, also you will need:
-- [Kind](https://kind.sigs.k8s.io)  for creating local cluster
-- [Go](https://go.dev) your operator should be written in Go
-- [Kubebuilder](https://book.kubebuilder.io) for creating the operator and crd template
-- [Operator-SDK](https://sdk.operatorframework.io/docs/) for documentation about controllers and syntax
-- [Ginkgo](https://onsi.github.io/ginkgo/) for testing
+```yaml
+apiVersion: labels.shahaf.com/v1alpha1
+kind: NamespaceLabel
+metadata:
+  name: labels
+  namespace: my-app
+spec:
+  labels:
+    app: my-app
+    environment: production
+    team: backend
+```
 
-## Bonus
-- Use GitHub actions to protect the main branch and test every pull request automatically
-- Implement e2e testing
-- [Use ECS for logging](https://www.elastic.co/guide/en/ecs/current/index.html)
+**🛡️ Admin-Controlled Protection**
+
+Cluster administrators can protect sensitive labels using a ConfigMap:
+
+```yaml
+# config/protection/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespacelabel-protection-config
+  namespace: namespacelabel-system
+data:
+  patterns: |
+    - "kubernetes.io/*"
+    - "*.k8s.io/*"
+    - "istio.io/*"
+    - "pod-security.kubernetes.io/*"
+  mode: fail  # "skip" or "fail"
+```
+
+**Protection Modes:**
+- `skip` - Silently skip protected labels ✅ (default)
+- `fail` - Fail entire reconciliation with clear error ❌
+
+## 🔧 Development
+
+### Build & Test
+```bash
+# Build locally
+make build
+
+# Run unit tests
+make test
+
+# Run E2E tests (requires cluster)
+make test-e2e
+
+# Run tests sequentially (for debugging)
+make test-e2e-debug
+
+# Lint code
+make lint
+```
+
+### Local Development
+```bash
+# Generate manifests after code changes
+make manifests
+
+# Run controller locally (requires cluster access)
+make run
+
+# Format and vet code
+make fmt vet
+```
+
+### Container Images
+```bash
+# Build container image (uses default image name)
+make docker-build
+
+# Build with custom image name
+make docker-build MANAGER_IMG=my-registry/namespacelabel-manager:v1.0.0
+
+# Push to registry (uses default image name)
+make docker-push
+
+# Push with custom image name  
+make docker-push MANAGER_IMG=my-registry/namespacelabel-manager:v1.0.0
+
+# Generate installer manifest (uses default images)
+make generate-installer
+
+# Generate installer with custom image
+make generate-installer MANAGER_IMG=my-registry/namespacelabel-manager:v1.0.0
+```
+
+## 🚢 Deployment
+
+### Development Deployment
+```bash
+# Step-by-step deployment
+make install                                                    # Install CRDs
+make deploy                                           # Deploy with default image
+make deploy MANAGER_IMG=your-registry/manager:tag       # Deploy with custom image
+make deploy-status                                              # Check status
+```
+
+### Cleanup
+```bash
+# Remove everything
+make cleanup
+
+# Or step by step
+make undeploy    # Remove controller
+make uninstall   # Remove CRDs
+```
+
+## 📋 API Reference
+
+### NamespaceLabel Spec
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `labels` | `map[string]string` | Labels to apply to namespace |
+
+### Examples
+
+**Basic Usage:**
+```yaml
+spec:
+  labels:
+    app: web-app
+    environment: production
+```
+
+**Admin Protection ConfigMap:**
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespacelabel-protection-config
+  namespace: namespacelabel-system
+data:
+  patterns: |
+    - "kubernetes.io/*"
+    - "istio.io/*"
+    - "pod-security.kubernetes.io/*"
+  mode: fail
+```
+
+## 🔐 RBAC
+
+The operator creates these ClusterRoles:
+
+- `namespacelabel-editor-role` - For users to manage NamespaceLabel CRs
+- `namespacelabel-viewer-role` - Read-only access to NamespaceLabel CRs
+
+**Grant access to users:**
+```bash
+kubectl create clusterrolebinding alice-namespacelabel-editor \
+  --clusterrole=namespacelabel-editor-role \
+  --user=alice@company.com
+```
+
+## 🆘 Troubleshooting
+
+**Common Issues:**
+
+1. **Labels not applied** - Check controller status: `make deploy-status` or check logs: `kubectl logs -n namespacelabel-system deployment/namespacelabel-controller-manager`
+2. **Protection conflicts** - Review `protectedLabelPatterns` and `protectionMode`
+3. **Permission denied** - Ensure user has `namespacelabel-editor-role`
+4. **Controller not ready** - Check deployment: `make deploy-status`
+
+**Debug Commands:**
+```bash
+# Check controller status
+kubectl get deployment -n namespacelabel-system
+
+# View NamespaceLabel status  
+kubectl get namespacelabel labels -n my-app -o yaml
+
+# Check namespace labels
+kubectl get namespace my-app --show-labels
+```
+
+## 📄 License
+
+Apache License 2.0
+
