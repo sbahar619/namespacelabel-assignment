@@ -1,6 +1,6 @@
 module github.com/sbahar619/namespace-label-operator
 
-go 1.21
+go 1.23
 
 require (
 	github.com/onsi/ginkgo/v2 v2.14.0
