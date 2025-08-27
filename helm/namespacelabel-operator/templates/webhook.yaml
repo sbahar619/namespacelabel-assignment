@@ -1,0 +1,29 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Values.namespace.name }}/{{ include "namespacelabel.namePrefix" . }}webhook-serving-cert
+  labels:
+    {{- include "namespacelabel.labels" . | nindent 4 }}
+  name: {{ include "namespacelabel.namePrefix" . }}validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "namespacelabel.namePrefix" . }}webhook-service
+      namespace: {{ .Values.namespace.name }}
+      path: /validate-labels-shahaf-com-v1alpha1-namespacelabel
+  failurePolicy: Fail
+  name: vnamespacelabel-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - labels.shahaf.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - namespacelabels
+  sideEffects: None
