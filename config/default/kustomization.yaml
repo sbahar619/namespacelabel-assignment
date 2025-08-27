@@ -1,0 +1,98 @@
+# Adds namespace to all resources.
+namespace: namespacelabel-system
+
+# Value of this field is prepended to the
+# names of all resources, e.g. a deployment named
+# "wordpress" becomes "alices-wordpress".
+# Note that it should also match with the prefix (text before '-') of the namespace
+# field above.
+namePrefix: namespacelabel-
+
+# Labels to add to all resources and selectors.
+#labels:
+#- includeSelectors: true
+#  pairs:
+#    someName: someValue
+
+resources:
+- ../crd
+- ../rbac
+- ../manager
+- ../protection
+- ../certmanager
+#- ../prometheus
+
+patches:
+# Protect the /metrics endpoint by putting it behind auth.
+# If you want your controller-manager to expose the /metrics
+# endpoint w/o any authn/z, please comment the following line.
+- path: manager_auth_proxy_patch.yaml
+
+
+replacements:
+- source:
+    kind: Certificate
+    group: cert-manager.io
+    version: v1
+    name: webhook-serving-cert
+    fieldPath: .metadata.namespace
+  targets:
+  - select:
+      kind: ValidatingWebhookConfiguration
+    fieldPaths:
+    - .metadata.annotations.[cert-manager.io/inject-ca-from]
+    options:
+      delimiter: '/'
+      index: 0
+      create: true
+- source:
+    kind: Certificate
+    group: cert-manager.io
+    version: v1
+    name: webhook-serving-cert
+    fieldPath: .metadata.name
+  targets:
+  - select:
+      kind: ValidatingWebhookConfiguration
+    fieldPaths:
+    - .metadata.annotations.[cert-manager.io/inject-ca-from]
+    options:
+      delimiter: '/'
+      index: 1
+      create: true
+- source:
+    kind: Service
+    version: v1
+    name: webhook-service
+    fieldPath: .metadata.name
+  targets:
+  - select:
+      kind: Certificate
+      group: cert-manager.io
+      version: v1
+      name: webhook-serving-cert
+    fieldPaths:
+    - .spec.dnsNames.0
+    - .spec.dnsNames.1
+    options:
+      delimiter: '.'
+      index: 0
+      create: true
+- source:
+    kind: Service
+    version: v1
+    name: webhook-service
+    fieldPath: .metadata.namespace
+  targets:
+  - select:
+      kind: Certificate
+      group: cert-manager.io
+      version: v1
+      name: webhook-serving-cert
+    fieldPaths:
+    - .spec.dnsNames.0
+    - .spec.dnsNames.1
+    options:
+      delimiter: '.'
+      index: 1
+      create: true

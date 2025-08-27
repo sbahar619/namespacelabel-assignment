@@ -1,0 +1,18 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: webhook-serving-cert
+  namespace: system
+spec:
+  secretName: webhook-server-cert
+  issuerRef:
+    name: namespacelabel-namespacelabel-ca-issuer
+    kind: Issuer
+  dnsNames:
+  - webhook-service.system.svc
+  - webhook-service.system.svc.cluster.local
+  - webhook-service
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
