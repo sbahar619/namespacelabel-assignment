@@ -1,0 +1,16 @@
+apiVersion: v2
+name: namespacelabel-operator
+description: A Helm chart for NamespaceLabel Operator
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - kubernetes
+  - operator
+  - namespace
+  - labels
+home: https://github.com/sbahar619/namespacelabel-assignment
+sources:
+  - https://github.com/sbahar619/namespacelabel-assignment
+maintainers:
+  - name: namespacelabel-operator
