@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespacelabel-protection-config
+  namespace: namespacelabel-system
+data:
+  patterns: |
+    - "kubernetes.io/*"
+    - "*.k8s.io/*"
+    - "istio.io/*"
+    - "pod-security.kubernetes.io/*"
+  mode: "fail"
+

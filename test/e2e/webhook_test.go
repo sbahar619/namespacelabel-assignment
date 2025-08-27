@@ -1,0 +1,119 @@
+/*
+Copyright 2025.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package e2e
+
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/sbahar619/namespace-label-operator/test/utils"
+)
+
+var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func() {
+	var (
+		k8sClient client.Client
+		ctx       context.Context
+		testNS    string
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		// Use nanoseconds and random number to avoid collisions
+		testNS = fmt.Sprintf("webhook-test-%d-%d", time.Now().UnixNano(), rand.Int31())
+
+		By("Setting up Kubernetes client")
+		var err error
+		k8sClient, err = utils.GetK8sClient()
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating test namespace")
+		utils.CreateTestNamespace(ctx, k8sClient, testNS, nil)
+	})
+
+	AfterEach(func() {
+		By("Cleaning up test namespace")
+
+		By("Cleaning up NamespaceLabel CRs to remove finalizers")
+		utils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
+
+		// Now delete the namespace
+		By("Deleting the test namespace")
+		utils.DeleteTestNamespace(ctx, k8sClient, testNS)
+
+		// Wait for namespace to be fully deleted
+		By("Waiting for namespace to be fully deleted")
+		Eventually(func() bool {
+			checkNS := &corev1.Namespace{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: testNS}, checkNS)
+			return errors.IsNotFound(err)
+		}, time.Second*60, time.Second*2).Should(BeTrue(),
+			fmt.Sprintf("Namespace %s should be deleted within 30 seconds", testNS))
+	})
+
+	Context("Name Validation", func() {
+		It("should reject invalid CR names", func() {
+			By("Creating a NamespaceLabel CR with invalid name and expecting webhook rejection")
+			cr := utils.NewNamespaceLabel(utils.CROptions{
+				Name: "invalid-name",
+				Labels: map[string]string{
+					"test": "value",
+				},
+			}, testNS)
+
+			utils.ExpectWebhookRejection(ctx, k8sClient, cr,
+				"NamespaceLabel resource must be named 'labels' for singleton pattern enforcement")
+		})
+	})
+
+	Context("Singleton Enforcement", func() {
+
+		It("should prevent creation of second CR with valid name when one already exists", func() {
+			By("Creating the first valid NamespaceLabel CR")
+			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+				Labels: map[string]string{
+					"environment": "production",
+				},
+			}, testNS)
+
+			By("Attempting to create a second NamespaceLabel CR with the same valid name")
+			cr2 := utils.NewNamespaceLabel(utils.CROptions{
+				Name: "labels", // Same name as first CR
+				Labels: map[string]string{
+					"team": "platform",
+				},
+			}, testNS)
+
+			By("Attempting to create the duplicate CR")
+			err := k8sClient.Create(ctx, cr2)
+
+			By("Verifying appropriate error message")
+			Expect(err).To(HaveOccurred(), "Expected error when creating duplicate CR")
+			Expect(err.Error()).To(ContainSubstring("only one NamespaceLabel resource is allowed per namespace"),
+				"Expected webhook singleton rejection")
+		})
+	})
+})
