@@ -11,7 +11,7 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 env:
-  GO_VERSION: '1.21'
+  GO_VERSION: '1.23'
   GOLANGCI_LINT_VERSION: 'v1.57.2'
 
 jobs:

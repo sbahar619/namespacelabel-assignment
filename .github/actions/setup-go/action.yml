@@ -5,7 +5,7 @@ inputs:
   go-version:
     description: 'Go version to use'
     required: true
-    default: '1.21'
+    default: '1.23'
   cache-dependency-path:
     description: 'Path to dependency files for cache key'
     required: false
