@@ -35,9 +35,6 @@ const (
 	// Protection ConfigMap details
 	ProtectionConfigMapName = "namespacelabel-protection-config"
 	ProtectionNamespace     = "namespacelabel-system"
-
-	// Admin override annotation
-	AllowDeletionAnnotation = "labels.shahaf.com/allow-deletion"
 )
 
 // SetupConfigMapWebhookWithManager configures the ConfigMap protection webhook
@@ -74,20 +71,11 @@ func (v *ConfigMapProtectionValidator) ValidateDelete(ctx context.Context, obj r
 	}
 
 	if cm.Name == ProtectionConfigMapName && cm.Namespace == ProtectionNamespace {
-		configmaplog.Info("Protection ConfigMap deletion attempt detected",
+		configmaplog.Info("Protection ConfigMap deletion attempt blocked",
 			"configMap", fmt.Sprintf("%s/%s", cm.Namespace, cm.Name))
 
-		if cm.Annotations != nil && cm.Annotations[AllowDeletionAnnotation] == "true" {
-			configmaplog.Info("Admin override detected - allowing protection ConfigMap deletion",
-				"configMap", fmt.Sprintf("%s/%s", cm.Namespace, cm.Name),
-				"annotation", AllowDeletionAnnotation)
-			return nil, nil
-		}
-
-		return nil, fmt.Errorf("protection ConfigMap '%s/%s' cannot be deleted as it contains security-critical configuration. "+
-			"If deletion is absolutely necessary, add annotation '%s=true' to the ConfigMap first. "+
-			"WARNING: This will disable NamespaceLabel protection until the ConfigMap is restored",
-			cm.Namespace, cm.Name, AllowDeletionAnnotation)
+		return nil, fmt.Errorf("protection ConfigMap '%s/%s' cannot be deleted",
+			cm.Namespace, cm.Name)
 	}
 
 	// Allow deletion of other ConfigMaps

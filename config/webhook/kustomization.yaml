@@ -11,4 +11,4 @@ kind: Kustomization
 images:
 - name: webhook
   newName: quay.io/sbahar/namespacelabel-webhook
-  newTag: dev-40
+  newTag: dev-42
