@@ -151,12 +151,12 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 			// Set up no protection once for all tests in this group
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateNoProtectionConfig(ctx, k8sClient)).To(Succeed())
 		})
 
 		AfterAll(func() {
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should apply all labels when protection is disabled via ConfigMap", func() {
@@ -185,14 +185,14 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 			// Set up system.io protection once for all tests in this group
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"system.io/*",
 			})).To(Succeed())
 		})
 
 		AfterAll(func() {
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should prevent protection bypass through annotation race condition", func() {
@@ -271,14 +271,14 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 			// Set up kubernetes.io protection in fail mode for this group
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateFailModeConfig(ctx, k8sClient, []string{
 				"kubernetes.io/*",
 			})).To(Succeed())
 		})
 
 		AfterAll(func() {
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should fail reconciliation in fail mode when protected labels conflict", func() {
@@ -331,14 +331,14 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 			// Set up istio.io protection in skip mode for this group
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"istio.io/*",
 			})).To(Succeed())
 		})
 
 		AfterAll(func() {
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should skip protected labels in skip mode", func() {
@@ -447,14 +447,14 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 			// Set up app.kubernetes.io protection in skip mode for this group
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"app.kubernetes.io/*",
 			})).To(Succeed())
 		})
 
 		AfterAll(func() {
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should report correct status with applied and skipped labels", func() {

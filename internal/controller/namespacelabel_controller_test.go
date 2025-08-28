@@ -517,7 +517,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				"kubernetes.io/managed-by": "existing",
 			}
 
-			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, emptyConfig)
+			allowed, skipped, err := reconciler.filterProtectedLabels(desired, existing, emptyConfig)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(allowed).To(Equal(desired))
@@ -535,7 +535,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				"app.k8s.io/version":       "existing-version",
 			}
 
-			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, testConfig)
+			allowed, skipped, err := reconciler.filterProtectedLabels(desired, existing, testConfig)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(allowed).To(HaveKeyWithValue("app", "myapp"))
@@ -558,7 +558,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				"kubernetes.io/managed-by": "existing-value",
 			}
 
-			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, failConfig)
+			allowed, skipped, err := reconciler.filterProtectedLabels(desired, existing, failConfig)
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("protected label 'kubernetes.io/managed-by' cannot be modified"))
@@ -575,7 +575,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				"kubernetes.io/managed-by": "same-value",
 			}
 
-			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, testConfig)
+			allowed, skipped, err := reconciler.filterProtectedLabels(desired, existing, testConfig)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(allowed).To(Equal(desired))
@@ -589,7 +589,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			}
 			existing := map[string]string{} // No existing protected label
 
-			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, testConfig)
+			allowed, skipped, err := reconciler.filterProtectedLabels(desired, existing, testConfig)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(allowed).To(Equal(desired)) // Both labels should be allowed

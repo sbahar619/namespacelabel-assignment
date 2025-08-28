@@ -231,7 +231,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 
 		AfterEach(func() {
 			// Clean up protection ConfigMap after each test
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should handle same protection patterns across different namespaces", func() {

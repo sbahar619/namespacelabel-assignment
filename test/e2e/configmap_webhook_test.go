@@ -86,7 +86,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 
 		AfterEach(func() {
 			By("Cleaning up protection ConfigMap")
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should reject deletion of protection ConfigMap", func() {
@@ -284,7 +284,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 				Expect(err).NotTo(HaveOccurred(), "Webhook should not block ConfigMap creation")
 
 				// Clean up
-				k8sClient.Delete(ctx, cm)
+				_ = k8sClient.Delete(ctx, cm)
 			}
 		})
 
@@ -315,7 +315,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			Expect(err).NotTo(HaveOccurred(), "Webhook should not block ConfigMap updates")
 
 			// Clean up
-			k8sClient.Delete(ctx, testCM)
+			_ = k8sClient.Delete(ctx, testCM)
 		})
 	})
 })

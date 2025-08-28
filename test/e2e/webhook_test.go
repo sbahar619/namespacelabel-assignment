@@ -148,7 +148,8 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func(
 
 			By("Verifying appropriate error message")
 			Expect(err).To(HaveOccurred(), "Expected error when creating duplicate CR")
-			Expect(err.Error()).To(ContainSubstring("only one NamespaceLabel resource is allowed per namespace"), "Expected webhook singleton rejection")
+			Expect(err.Error()).To(ContainSubstring("only one NamespaceLabel resource is allowed per namespace"),
+				"Expected webhook singleton rejection")
 		})
 	})
 })

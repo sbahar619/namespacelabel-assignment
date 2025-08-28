@@ -72,7 +72,7 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
-	allowedLabels, skippedLabels, err := r.filterProtectedLabels(ctx, desired, ns.Labels, protectionConfig)
+	allowedLabels, skippedLabels, err := r.filterProtectedLabels(desired, ns.Labels, protectionConfig)
 	if err != nil {
 		updateStatus(&current, false, "ProtectionError", err.Error(), nil)
 		if statusErr := r.Status().Update(ctx, &current); statusErr != nil {
@@ -231,7 +231,6 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 
 // filterProtectedLabels applies label protection rules, returning allowed labels and skipped protected labels
 func (r *NamespaceLabelReconciler) filterProtectedLabels(
-	ctx context.Context,
 	desired map[string]string,
 	existing map[string]string,
 	config *ProtectionConfig,

@@ -77,7 +77,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 			// Set up nested wildcard patterns once for this group
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"*.*.k8s.io/*",
 				"*.istio.io/*",
@@ -85,7 +85,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 		})
 
 		AfterAll(func() {
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should handle nested wildcard patterns correctly", func() {
@@ -122,7 +122,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 			// Set up overlapping kubernetes.io patterns once for this group
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"kubernetes.io/*",          // Broader pattern
 				"*.kubernetes.io/*",        // More specific pattern
@@ -131,7 +131,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 		})
 
 		AfterAll(func() {
-			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should handle conflicting patterns with proper precedence", func() {

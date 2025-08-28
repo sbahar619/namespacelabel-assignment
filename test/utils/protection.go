@@ -232,7 +232,7 @@ func waitForControllerSync(ctx context.Context, k8sClient client.Client) error {
 
 	cleanup := func() {
 		CleanupNamespaceLabels(ctx, k8sClient, testNSName)
-		k8sClient.Delete(ctx, testNS)
+		_ = k8sClient.Delete(ctx, testNS)
 	}
 	defer cleanup()
 
