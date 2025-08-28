@@ -69,12 +69,10 @@ func (v *NamespaceLabelCustomValidator) ValidateCreate(ctx context.Context, obj 
 	}
 	namespacelabellog.Info("Validation for NamespaceLabel upon creation", "name", namespacelabel.GetName(), "namespace", namespacelabel.GetNamespace())
 
-	// Validate name (singleton pattern)
 	if err := v.validateName(namespacelabel); err != nil {
 		return nil, err
 	}
 
-	// Validate singleton (only one NamespaceLabel per namespace)
 	if err := v.validateSingleton(ctx, namespacelabel, nil); err != nil {
 		return nil, err
 	}
@@ -95,12 +93,10 @@ func (v *NamespaceLabelCustomValidator) ValidateUpdate(ctx context.Context, oldO
 
 	namespacelabellog.Info("Validation for NamespaceLabel upon update", "name", namespacelabel.GetName(), "namespace", namespacelabel.GetNamespace())
 
-	// Validate name (singleton pattern)
 	if err := v.validateName(namespacelabel); err != nil {
 		return nil, err
 	}
 
-	// Validate singleton (only one NamespaceLabel per namespace)
 	if err := v.validateSingleton(ctx, namespacelabel, oldNamespacelabel); err != nil {
 		return nil, err
 	}

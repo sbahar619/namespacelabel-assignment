@@ -26,9 +26,8 @@ type ProtectionConfigOptions struct {
 	Mode     string // "skip", "fail"
 }
 
-// CreateProtectionConfigMap creates or updates the protection ConfigMap directly with retry logic
+// CreateProtectionConfigMap creates or updates the protection ConfigMap with retry logic
 func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opts ProtectionConfigOptions) error {
-	// Format patterns as YAML list
 	var patternsYAML string
 	if len(opts.Patterns) > 0 {
 		patternLines := make([]string, len(opts.Patterns))
@@ -46,9 +45,7 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opt
 		"app.kubernetes.io/managed-by": "namespacelabel-test",
 	}
 
-	// Retry logic for handling concurrent updates
 	for retries := 0; retries < 5; retries++ {
-		// Try to create first
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ProtectionConfigMapName,
@@ -60,12 +57,10 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opt
 
 		err := k8sClient.Create(ctx, cm)
 		if err == nil {
-			// Successfully created
 			break
 		}
 
 		if apierrors.IsAlreadyExists(err) {
-			// ConfigMap exists, try to update it
 			existing := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
 				Name:      ProtectionConfigMapName,
@@ -79,7 +74,6 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opt
 				return err
 			}
 
-			// Update with new data
 			existing.Data = data
 			existing.Labels = labels
 			err = k8sClient.Update(ctx, existing)
@@ -109,6 +103,7 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opt
 }
 
 // DeleteProtectionConfigMap deletes the protection ConfigMap
+// DeleteProtectionConfigMap removes the protection ConfigMap
 func DeleteProtectionConfigMap(ctx context.Context, k8sClient client.Client) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -125,6 +120,7 @@ func DeleteProtectionConfigMap(ctx context.Context, k8sClient client.Client) err
 }
 
 // EnsureProtectionNamespace ensures the namespacelabel-system namespace exists
+// EnsureProtectionNamespace creates the protection namespace if it doesn't exist
 func EnsureProtectionNamespace(ctx context.Context, k8sClient client.Client) error {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -140,6 +136,7 @@ func EnsureProtectionNamespace(ctx context.Context, k8sClient client.Client) err
 }
 
 // GetProtectionConfigMap retrieves the current protection ConfigMap
+// GetProtectionConfigMap retrieves the protection ConfigMap
 func GetProtectionConfigMap(ctx context.Context, k8sClient client.Client) (*corev1.ConfigMap, error) {
 	cm := &corev1.ConfigMap{}
 	err := k8sClient.Get(ctx, types.NamespacedName{
@@ -152,7 +149,7 @@ func GetProtectionConfigMap(ctx context.Context, k8sClient client.Client) (*core
 // CreateNoProtectionConfig creates a ConfigMap that disables all protection
 func CreateNoProtectionConfig(ctx context.Context, k8sClient client.Client) error {
 	return CreateProtectionConfigMap(ctx, k8sClient, ProtectionConfigOptions{
-		Patterns: []string{}, // No patterns = no protection
+		Patterns: []string{},
 		Mode:     "skip",
 	})
 }
@@ -183,13 +180,12 @@ func CreateDefaultProtectionConfig(ctx context.Context, k8sClient client.Client)
 	})
 }
 
-// WaitForProtectionConfigUpdate waits for the controller to pick up ConfigMap changes by testing actual protection behavior
+// WaitForProtectionConfigUpdate waits for the controller to pick up ConfigMap changes
 func WaitForProtectionConfigUpdate(ctx context.Context, k8sClient client.Client, opts ProtectionConfigOptions) error {
 	timeout := 30 * time.Second
 	interval := 500 * time.Millisecond
 	start := time.Now()
 
-	// First, wait for the ConfigMap to be readable with the expected values
 	for time.Since(start) < timeout {
 		cm, err := GetProtectionConfigMap(ctx, k8sClient)
 		if err != nil {
@@ -197,30 +193,24 @@ func WaitForProtectionConfigUpdate(ctx context.Context, k8sClient client.Client,
 			continue
 		}
 
-		// Check if the ConfigMap has the expected data
 		if cm.Data["mode"] == opts.Mode {
 			expectedPatterns := formatPatternsForComparison(opts.Patterns)
 			actualPatterns := formatPatternsForComparison(parseConfigMapPatterns(cm.Data["patterns"]))
 
 			if expectedPatterns == actualPatterns {
-				break // ConfigMap is updated correctly
+				break
 			}
 		}
 		time.Sleep(interval)
 	}
 
-	// Now wait to ensure the controller has picked up the ConfigMap changes
-	// by doing a basic test that doesn't cause conflicts
 	if err := waitForControllerSync(ctx, k8sClient); err != nil {
-		// If sync fails, wait a bit more and try again
 		for time.Since(start) < timeout {
 			time.Sleep(interval)
 			if err := waitForControllerSync(ctx, k8sClient); err == nil {
 				return nil
 			}
 		}
-		// If still failing, just wait extra time and continue
-		// The actual tests will validate protection behavior properly
 		time.Sleep(3 * time.Second)
 	}
 
@@ -229,7 +219,6 @@ func WaitForProtectionConfigUpdate(ctx context.Context, k8sClient client.Client,
 
 // waitForControllerSync ensures the controller is responsive by creating a simple test
 func waitForControllerSync(ctx context.Context, k8sClient client.Client) error {
-	// Create a temporary test namespace with a unique name
 	testNSName := fmt.Sprintf("sync-test-%d-%d", time.Now().UnixNano(), rand.Int31())
 	testNS := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -241,17 +230,12 @@ func waitForControllerSync(ctx context.Context, k8sClient client.Client) error {
 		return fmt.Errorf("failed to create sync test namespace: %w", err)
 	}
 
-	// Cleanup function
 	cleanup := func() {
-		// Clean up NamespaceLabel CRs first
 		CleanupNamespaceLabels(ctx, k8sClient, testNSName)
-
-		// Delete test namespace
 		k8sClient.Delete(ctx, testNS)
 	}
 	defer cleanup()
 
-	// Create a simple NamespaceLabel CR that should always work
 	cr := NewNamespaceLabel(CROptions{
 		Labels: map[string]string{
 			"sync-test": "true",
@@ -262,16 +246,13 @@ func waitForControllerSync(ctx context.Context, k8sClient client.Client) error {
 		return fmt.Errorf("failed to create sync test CR: %w", err)
 	}
 
-	// Wait for the controller to process it (should be fast for simple cases)
 	time.Sleep(time.Second)
 
-	// Check that the CR was processed (has status conditions)
 	updatedCR := &labelsv1alpha1.NamespaceLabel{}
 	if err := k8sClient.Get(ctx, types.NamespacedName{Name: "labels", Namespace: testNSName}, updatedCR); err != nil {
 		return fmt.Errorf("failed to get sync test CR: %w", err)
 	}
 
-	// Verify the controller has processed it (has status)
 	if len(updatedCR.Status.Conditions) == 0 {
 		return fmt.Errorf("controller not responding - CR has no status conditions")
 	}

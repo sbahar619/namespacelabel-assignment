@@ -40,6 +40,7 @@ const (
 	AllowDeletionAnnotation = "labels.shahaf.com/allow-deletion"
 )
 
+// SetupConfigMapWebhookWithManager configures the ConfigMap protection webhook
 func SetupConfigMapWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&corev1.ConfigMap{}).
 		WithValidator(&ConfigMapProtectionValidator{
@@ -59,12 +60,10 @@ type ConfigMapProtectionValidator struct {
 var _ webhook.CustomValidator = &ConfigMapProtectionValidator{}
 
 func (v *ConfigMapProtectionValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	// No validation needed for create operations
 	return nil, nil
 }
 
 func (v *ConfigMapProtectionValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	// No validation needed for update operations
 	return nil, nil
 }
 
@@ -74,12 +73,10 @@ func (v *ConfigMapProtectionValidator) ValidateDelete(ctx context.Context, obj r
 		return nil, fmt.Errorf("expected a ConfigMap object but got %T", obj)
 	}
 
-	// Only protect our specific security-critical ConfigMap
 	if cm.Name == ProtectionConfigMapName && cm.Namespace == ProtectionNamespace {
 		configmaplog.Info("Protection ConfigMap deletion attempt detected",
 			"configMap", fmt.Sprintf("%s/%s", cm.Namespace, cm.Name))
 
-		// Check for admin override annotation
 		if cm.Annotations != nil && cm.Annotations[AllowDeletionAnnotation] == "true" {
 			configmaplog.Info("Admin override detected - allowing protection ConfigMap deletion",
 				"configMap", fmt.Sprintf("%s/%s", cm.Namespace, cm.Name),
@@ -87,7 +84,6 @@ func (v *ConfigMapProtectionValidator) ValidateDelete(ctx context.Context, obj r
 			return nil, nil
 		}
 
-		// Block the deletion with clear guidance
 		return nil, fmt.Errorf("protection ConfigMap '%s/%s' cannot be deleted as it contains security-critical configuration. "+
 			"If deletion is absolutely necessary, add annotation '%s=true' to the ConfigMap first. "+
 			"WARNING: This will disable NamespaceLabel protection until the ConfigMap is restored",

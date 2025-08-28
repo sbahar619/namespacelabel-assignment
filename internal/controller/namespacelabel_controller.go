@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// RBAC: access our CRD + update Namespaces + read ConfigMaps for protection config.
 // +kubebuilder:rbac:groups=labels.shahaf.com,resources=namespacelabels,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=labels.shahaf.com,resources=namespacelabels/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=labels.shahaf.com,resources=namespacelabels/finalizers,verbs=update
@@ -24,8 +23,6 @@ import (
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 
 func (r *NamespaceLabelReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Create the controller to watch NamespaceLabels only
-	// ConfigMap protection is now handled by admission webhook
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&labelsv1alpha1.NamespaceLabel{}).
 		Complete(r)
@@ -65,26 +62,21 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// Process namespace labels
 	desired := current.Spec.Labels
 	prevApplied := readAppliedAnnotation(ns)
 
-	// Initialize labels map if needed
 	if ns.Labels == nil {
 		ns.Labels = map[string]string{}
 	}
 
-	// Get admin protection configuration
 	protectionConfig, err := r.getProtectionConfig(ctx)
 	if err != nil {
 		l.Error(err, "failed to read protection config")
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
-	// Apply protection filtering
 	allowedLabels, skippedLabels, err := r.filterProtectedLabels(ctx, desired, ns.Labels, protectionConfig)
 	if err != nil {
-		// Protection mode "fail" was triggered
 		updateStatus(&current, false, "ProtectionError", err.Error(), nil)
 		if statusErr := r.Status().Update(ctx, &current); statusErr != nil {
 			l.Error(statusErr, "failed to update status for protection error")
@@ -92,7 +84,6 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: time.Minute * 5}, err
 	}
 
-	// Apply allowed labels only
 	changed := r.applyLabelsToNamespace(ns, allowedLabels, prevApplied)
 
 	if changed {
@@ -102,7 +93,6 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if err := writeAppliedAnnotation(ctx, r.Client, ns, allowedLabels); err != nil {
-		// Log error but don't fail reconciliation since labels were applied successfully
 		l.Error(err, "failed to write applied annotation")
 	}
 
@@ -136,7 +126,7 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{}, nil
 }
 
-// finalize cleans up namespace labels and removes the finalizer
+// finalize handles NamespaceLabel deletion by removing applied labels from the target namespace
 func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alpha1.NamespaceLabel) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
 
@@ -169,6 +159,7 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 }
 
 // getTargetNamespace retrieves the namespace that should be modified
+// getTargetNamespace retrieves the target namespace, creating it if it doesn't exist
 func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targetNS string) (*corev1.Namespace, error) {
 	if targetNS == "" {
 		return nil, fmt.Errorf("empty namespace name")
@@ -182,6 +173,7 @@ func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targe
 }
 
 // applyLabelsToNamespace applies desired labels and removes stale ones
+// applyLabelsToNamespace applies desired labels to namespace, removing previously applied labels not in desired set
 func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, desired, prevApplied map[string]string) bool {
 	if ns.Labels == nil {
 		ns.Labels = make(map[string]string)
@@ -193,6 +185,7 @@ func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, 
 }
 
 // getProtectionConfig reads admin protection configuration from ConfigMap
+// getProtectionConfig retrieves label protection configuration from the admin ConfigMap
 func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*ProtectionConfig, error) {
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{
@@ -251,6 +244,7 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 }
 
 // filterProtectedLabels applies protection rules to desired labels
+// filterProtectedLabels applies label protection rules, returning allowed labels and skipped protected labels
 func (r *NamespaceLabelReconciler) filterProtectedLabels(
 	ctx context.Context,
 	desired map[string]string,
