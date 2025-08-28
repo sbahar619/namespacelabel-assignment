@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -55,6 +56,14 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			Scheme: scheme,
 		}
 		ctx = context.TODO()
+
+		// Create the namespacelabel-system namespace for protection ConfigMap
+		protectionNS := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ProtectionNamespace,
+			},
+		}
+		Expect(fakeClient.Create(ctx, protectionNS)).To(Succeed())
 	})
 
 	// Helper functions to reduce code duplication
@@ -84,6 +93,20 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		return cr
 	}
 
+	createProtectionConfigMap := func() {
+		protectionCM := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ProtectionConfigMapName,
+				Namespace: ProtectionNamespace,
+			},
+			Data: map[string]string{
+				"patterns": "- \"kubernetes.io/*\"\n- \"*.k8s.io/*\"",
+				"mode":     "skip",
+			},
+		}
+		Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+	}
+
 	reconcileRequest := func(name, namespace string) reconcile.Request {
 		return reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -101,6 +124,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 	Describe("Reconcile", func() {
 		It("should handle non-existent CR gracefully", func() {
+			createProtectionConfigMap()
 			createNamespace("test-ns", nil, nil)
 
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
@@ -127,6 +151,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should apply labels to namespace successfully", func() {
+			createProtectionConfigMap()
 			ns := createNamespace("test-ns", nil, nil)
 			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
 				Labels: map[string]string{
@@ -148,22 +173,108 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			Expect(updatedNS.Annotations).To(HaveKey(appliedAnnoKey))
 		})
 
-		It("should handle label protection in fail mode", func() {
+		It("should create protection ConfigMap and apply protection by default", func() {
+			// Create protection ConfigMap with fail mode to test protection
+			protectionCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ProtectionConfigMapName,
+					Namespace: ProtectionNamespace,
+				},
+				Data: map[string]string{
+					"patterns": "- \"kubernetes.io/*\"\n- \"*.k8s.io/*\"",
+					"mode":     "fail",
+				},
+			}
+			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+
 			ns := createNamespace("test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
 			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
 				Labels: map[string]string{
 					"app":                      "test",
-					"kubernetes.io/managed-by": "my-operator", // This should be protected
+					"kubernetes.io/managed-by": "my-operator", // Should be blocked by default protection
 				},
-				ProtectedLabelPatterns: []string{"kubernetes.io/*"},
-				ProtectionMode:         labelsv1alpha1.ProtectionModeFail,
+			})
+
+			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
+
+			Expect(err).To(HaveOccurred()) // Should fail due to default protection
+			Expect(err.Error()).To(ContainSubstring("protected label 'kubernetes.io/managed-by' cannot be modified"))
+			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+
+			// ConfigMap already exists and should have applied protection
+
+			// Verify protected label was not changed
+			var updatedNS corev1.Namespace
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &updatedNS)).To(Succeed())
+			Expect(updatedNS.Labels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
+		})
+
+		It("should skip protected labels when ConfigMap exists with skip mode", func() {
+			// Create protection ConfigMap
+			protectionCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ProtectionConfigMapName,
+					Namespace: ProtectionNamespace,
+				},
+				Data: map[string]string{
+					"patterns": "- \"kubernetes.io/*\"\n- \"*.k8s.io/*\"",
+					"mode":     "skip",
+				},
+			}
+			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+
+			ns := createNamespace("test-ns", map[string]string{
+				"kubernetes.io/managed-by": "existing-operator",
+			}, nil)
+			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
+				Labels: map[string]string{
+					"app":                      "test",
+					"kubernetes.io/managed-by": "my-operator",
+				},
+			})
+
+			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Verify app label applied, protected label skipped
+			var updatedNS corev1.Namespace
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &updatedNS)).To(Succeed())
+			Expect(updatedNS.Labels).To(HaveKeyWithValue("app", "test"))
+			Expect(updatedNS.Labels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
+		})
+
+		It("should fail reconciliation when ConfigMap exists with fail mode", func() {
+			// Create protection ConfigMap with fail mode
+			protectionCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ProtectionConfigMapName,
+					Namespace: ProtectionNamespace,
+				},
+				Data: map[string]string{
+					"patterns": "- \"kubernetes.io/*\"",
+					"mode":     "fail",
+				},
+			}
+			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+
+			ns := createNamespace("test-ns", map[string]string{
+				"kubernetes.io/managed-by": "existing-operator",
+			}, nil)
+			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
+				Labels: map[string]string{
+					"app":                      "test",
+					"kubernetes.io/managed-by": "my-operator", // Should cause failure
+				},
 			})
 
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
 
 			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("protected label 'kubernetes.io/managed-by' cannot be modified"))
 			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 
 			// Verify protected label was not changed
@@ -173,6 +284,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should handle label updates when spec changes", func() {
+			createProtectionConfigMap()
 			ns := createNamespace("test-ns", map[string]string{
 				"old-label": "old-value",
 			}, map[string]string{
@@ -310,5 +422,178 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	It("should create reconciler with proper configuration", func() {
 		Expect(reconciler.Client).NotTo(BeNil())
 		Expect(reconciler.Scheme).NotTo(BeNil())
+	})
+
+	Describe("getProtectionConfig", func() {
+		It("should return default config when ConfigMap does not exist", func() {
+			config, err := reconciler.getProtectionConfig(ctx)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(config).NotTo(BeNil())
+			Expect(config.Patterns).To(BeEmpty())
+			Expect(config.Mode).To(Equal("skip"))
+		})
+
+		It("should parse ConfigMap with patterns and mode correctly", func() {
+			protectionCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ProtectionConfigMapName,
+					Namespace: ProtectionNamespace,
+				},
+				Data: map[string]string{
+					"patterns": "- \"kubernetes.io/*\"\n- \"*.k8s.io/*\"\n- \"istio.io/*\"",
+					"mode":     "fail",
+				},
+			}
+			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+
+			config, err := reconciler.getProtectionConfig(ctx)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(config).NotTo(BeNil())
+			Expect(config.Patterns).To(ConsistOf("kubernetes.io/*", "*.k8s.io/*", "istio.io/*"))
+			Expect(config.Mode).To(Equal("fail"))
+		})
+
+		It("should handle ConfigMap with comments and extra whitespace", func() {
+			protectionCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ProtectionConfigMapName,
+					Namespace: ProtectionNamespace,
+				},
+				Data: map[string]string{
+					"patterns": "# This is a comment\n- \"kubernetes.io/*\"\n  \n- \"*.k8s.io/*\"  # inline comment\n\n",
+					"mode":     "  fail  ",
+				},
+			}
+			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+
+			config, err := reconciler.getProtectionConfig(ctx)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(config.Patterns).To(ConsistOf("kubernetes.io/*", "*.k8s.io/*"))
+			Expect(config.Mode).To(Equal("fail"))
+		})
+
+		It("should handle ConfigMap with only mode specified", func() {
+			protectionCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ProtectionConfigMapName,
+					Namespace: ProtectionNamespace,
+				},
+				Data: map[string]string{
+					"mode": "skip",
+				},
+			}
+			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+
+			config, err := reconciler.getProtectionConfig(ctx)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(config.Patterns).To(BeEmpty())
+			Expect(config.Mode).To(Equal("skip"))
+		})
+	})
+
+	Describe("filterProtectedLabels", func() {
+		var testConfig *ProtectionConfig
+
+		BeforeEach(func() {
+			// Create fresh config for each test to avoid pollution
+			testConfig = &ProtectionConfig{
+				Patterns: []string{"kubernetes.io/*", "*.k8s.io/*"},
+				Mode:     "skip",
+			}
+		})
+
+		It("should allow all labels when no patterns are defined", func() {
+			emptyConfig := &ProtectionConfig{Patterns: []string{}, Mode: "skip"}
+
+			desired := map[string]string{
+				"kubernetes.io/managed-by": "test",
+				"app":                      "myapp",
+			}
+			existing := map[string]string{
+				"kubernetes.io/managed-by": "existing",
+			}
+
+			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, emptyConfig)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(allowed).To(Equal(desired))
+			Expect(skipped).To(BeEmpty())
+		})
+
+		It("should skip protected labels in skip mode", func() {
+			desired := map[string]string{
+				"kubernetes.io/managed-by": "new-value",
+				"app.k8s.io/version":       "new-version",
+				"app":                      "myapp",
+			}
+			existing := map[string]string{
+				"kubernetes.io/managed-by": "existing-value",
+				"app.k8s.io/version":       "existing-version",
+			}
+
+			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, testConfig)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(allowed).To(HaveKeyWithValue("app", "myapp"))
+			Expect(allowed).NotTo(HaveKey("kubernetes.io/managed-by"))
+			Expect(allowed).NotTo(HaveKey("app.k8s.io/version"))
+			Expect(skipped).To(ConsistOf("kubernetes.io/managed-by", "app.k8s.io/version"))
+		})
+
+		It("should fail in fail mode when protected labels conflict", func() {
+			failConfig := &ProtectionConfig{
+				Patterns: []string{"kubernetes.io/*", "*.k8s.io/*"},
+				Mode:     "fail",
+			}
+
+			desired := map[string]string{
+				"kubernetes.io/managed-by": "new-value",
+				"app":                      "myapp",
+			}
+			existing := map[string]string{
+				"kubernetes.io/managed-by": "existing-value",
+			}
+
+			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, failConfig)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("protected label 'kubernetes.io/managed-by' cannot be modified"))
+			Expect(allowed).To(BeNil())
+			Expect(skipped).To(BeNil())
+		})
+
+		It("should allow protected labels with same values", func() {
+			desired := map[string]string{
+				"kubernetes.io/managed-by": "same-value",
+				"app":                      "myapp",
+			}
+			existing := map[string]string{
+				"kubernetes.io/managed-by": "same-value",
+			}
+
+			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, testConfig)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(allowed).To(Equal(desired))
+			Expect(skipped).To(BeEmpty())
+		})
+
+		It("should allow new protected labels in skip mode", func() {
+			desired := map[string]string{
+				"kubernetes.io/managed-by": "new-value",
+				"app":                      "myapp",
+			}
+			existing := map[string]string{} // No existing protected label
+
+			allowed, skipped, err := reconciler.filterProtectedLabels(context.Background(), desired, existing, testConfig)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(allowed).To(Equal(desired)) // Both labels should be allowed
+			Expect(skipped).To(BeEmpty())      // Nothing should be skipped for new labels
+		})
 	})
 })

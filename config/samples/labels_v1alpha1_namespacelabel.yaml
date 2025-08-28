@@ -12,16 +12,11 @@ spec:
   labels:
     environment: "development"
     team: "platform"
-    managed-by: "namespacelabel-operator"
-  
-  # Protection configuration - prevent overwriting important management labels
-  protectedLabelPatterns:
-    - "kubernetes.io/*"          # Protect all kubernetes.io labels
-    - "*.k8s.io/*"              # Protect all k8s.io domain labels
-    - "pod-security.kubernetes.io/*"  # Protect pod security labels
-  
-  # Protection mode - skip protected labels silently (default: skip)
-  protectionMode: skip
+    app: "sample-app"
+    tier: "backend"
   
   # NOTE: The operator enforces a singleton pattern - only one NamespaceLabel CR 
   # named "labels" is allowed per namespace for operational simplicity.
+  #
+  # Label protection is now configured by cluster administrators using a ConfigMap:
+  # kubectl apply -f config/protection/configmap.yaml

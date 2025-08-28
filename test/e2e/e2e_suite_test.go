@@ -17,12 +17,25 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"github.com/sbahar619/namespace-label-operator/test/utils"
 )
+
+var k8sClient client.Client
 
 // Run e2e tests using the Ginkgo runner.
 func TestE2E(t *testing.T) {
@@ -30,3 +43,36 @@ func TestE2E(t *testing.T) {
 	_, _ = fmt.Fprintf(GinkgoWriter, "Starting namespacelabel suite\n")
 	RunSpecs(t, "e2e suite")
 }
+
+var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+	By("checking cluster connectivity")
+	var err error
+	k8sClient, err = utils.GetK8sClient()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(k8sClient).NotTo(BeNil())
+
+	// Test cluster connectivity by listing namespaces
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	namespaces := &corev1.NamespaceList{}
+	err = k8sClient.List(ctx, namespaces)
+	Expect(err).NotTo(HaveOccurred(), "Failed to connect to cluster - ensure cluster is running and kubeconfig is correct")
+
+	By(fmt.Sprintf("connected to cluster with %d namespaces", len(namespaces.Items)))
+
+	By("adding custom types to scheme")
+	err = labelsv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Set the global test client for utils package to use
+	utils.GlobalTestClient = k8sClient
+})
+
+var _ = AfterSuite(func() {
+	By("cleaning up")
+	// Clear the global test client
+	utils.GlobalTestClient = nil
+})

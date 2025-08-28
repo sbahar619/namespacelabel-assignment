@@ -70,6 +70,9 @@ GINKGO_FOCUS ?=
 
 .PHONY: test-e2e
 test-e2e: ginkgo ## Run E2E tests in parallel. Use GINKGO_FOCUS=label to run specific tests.
+	@echo "Running e2e tests against cluster..."
+	@echo "Checking cluster connectivity..."
+	@(kubectl get ns > /dev/null 2>&1) || (echo "ERROR: Cannot connect to cluster. Ensure cluster is running and kubeconfig is correct." && exit 1)
 	$(GINKGO) -v --procs=16 --compilers=16 --fail-on-pending --show-node-events --timeout=15m $(if $(GINKGO_FOCUS),--label-filter="$(GINKGO_FOCUS)") ./test/e2e/
 
 .PHONY: test-e2e-debug

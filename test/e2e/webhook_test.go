@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,7 +34,7 @@ import (
 	"github.com/sbahar619/namespace-label-operator/test/utils"
 )
 
-var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), func() {
+var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func() {
 	var (
 		k8sClient client.Client
 		ctx       context.Context
@@ -82,14 +81,14 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), func() {
 			return // Skip waiting if delete failed
 		}
 
-		// Wait for namespace to be fully deleted with longer timeout
+		// Wait for namespace to be fully deleted
 		By("Waiting for namespace to be fully deleted")
 		Eventually(func() bool {
 			checkNS := &corev1.Namespace{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: testNS}, checkNS)
 			return errors.IsNotFound(err)
-		}, time.Minute*2, time.Second*2).Should(BeTrue(),
-			fmt.Sprintf("Namespace %s should be deleted within 2 minutes", testNS))
+		}, time.Second*30, time.Second*2).Should(BeTrue(),
+			fmt.Sprintf("Namespace %s should be deleted within 30 seconds", testNS))
 	})
 
 	Context("Name Validation", func() {
@@ -138,6 +137,7 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), func() {
 
 			By("Attempting to create a second NamespaceLabel CR with the same valid name")
 			cr2 := utils.NewNamespaceLabel(utils.CROptions{
+				Name: "labels", // Same name as first CR
 				Labels: map[string]string{
 					"team": "platform",
 				},
@@ -145,22 +145,10 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), func() {
 
 			By("Attempting to create the duplicate CR")
 			err := k8sClient.Create(ctx, cr2)
-			Expect(err).To(HaveOccurred())
 
 			By("Verifying appropriate error message")
-			// Accept either webhook validation error or standard Kubernetes "already exists" error
-			errorMsg := err.Error()
-			webhookError := "only one NamespaceLabel resource is allowed per namespace"
-			k8sError := "already exists"
-
-			Expect(errorMsg).To(Or(
-				ContainSubstring(webhookError), // Webhook validation message
-				ContainSubstring(k8sError),     // Standard Kubernetes API error
-			))
-
-			if !strings.Contains(errorMsg, webhookError) && strings.Contains(errorMsg, k8sError) {
-				By("Standard Kubernetes API rejection (webhook not running) - this is expected behavior")
-			}
+			Expect(err).To(HaveOccurred(), "Expected error when creating duplicate CR")
+			Expect(err.Error()).To(ContainSubstring("only one NamespaceLabel resource is allowed per namespace"), "Expected webhook singleton rejection")
 		})
 	})
 })

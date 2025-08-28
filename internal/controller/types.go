@@ -6,9 +6,11 @@ import (
 )
 
 const (
-	appliedAnnoKey = "labels.shahaf.com/applied" // JSON of map[string]string
-	FinalizerName  = "labels.shahaf.com/finalizer"
-	StandardCRName = "labels" // Standard name for NamespaceLabel CRs (singleton pattern)
+	appliedAnnoKey          = "labels.shahaf.com/applied"
+	FinalizerName           = "labels.shahaf.com/finalizer"
+	StandardCRName          = "labels" // Standard name for NamespaceLabel CRs (singleton pattern)
+	ProtectionConfigMapName = "namespacelabel-protection-config"
+	ProtectionNamespace     = "namespacelabel-system"
 )
 
 // NamespaceLabelReconciler reconciles a NamespaceLabel object
@@ -17,10 +19,8 @@ type NamespaceLabelReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// ProtectionResult represents the result of applying protection logic
-type ProtectionResult struct {
-	AllowedLabels    map[string]string
-	ProtectedSkipped []string
-	Warnings         []string
-	ShouldFail       bool
+// ProtectionConfig holds admin-configured protection settings
+type ProtectionConfig struct {
+	Patterns []string
+	Mode     string // "skip", "fail"
 }

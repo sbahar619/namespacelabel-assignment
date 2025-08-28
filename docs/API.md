@@ -11,15 +11,12 @@
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `labels` | `map[string]string` | No | `{}` | Labels to apply to the namespace |
-| `protectedLabelPatterns` | `[]string` | No | `[]` | Glob patterns for protected labels |
-| `protectionMode` | `string` | No | `skip` | Protection behavior: `skip`/`warn`/`fail` |
 
 ### Status Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `applied` | `bool` | Whether labels were successfully applied |
-| `protectedLabelsSkipped` | `[]string` | List of protected label keys that were skipped |
 | `labelsApplied` | `[]string` | List of label keys that were successfully applied |
 | `conditions` | `[]metav1.Condition` | Standard Kubernetes conditions with detailed status messages |
 
@@ -39,22 +36,23 @@ spec:
     tier: critical
 ```
 
-### With Protection
+### Admin-Controlled Protection
+
+Label protection is configured by cluster administrators using a ConfigMap:
+
 ```yaml
-apiVersion: labels.shahaf.com/v1alpha1
-kind: NamespaceLabel
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: labels
-  namespace: my-app
-spec:
-  labels:
-    environment: production
-    kubernetes.io/managed-by: my-operator  # Will be protected
-  protectedLabelPatterns:
+  name: namespacelabel-protection-config
+  namespace: namespacelabel-system
+data:
+  patterns: |
     - "kubernetes.io/*"
     - "*.k8s.io/*"
     - "istio.io/*"
-  protectionMode: warn
+    - "pod-security.kubernetes.io/*"
+  mode: fail  # "skip" or "fail"
 ```
 
 ### Protection Modes
@@ -62,7 +60,6 @@ spec:
 | Mode | Behavior | Use Case |
 |------|----------|----------|
 | `skip` | Silently skip protected labels | Default, non-disruptive |
-| `warn` | Skip + log warnings | Development, monitoring |
 | `fail` | Fail entire reconciliation | Strict environments |
 
 ### Common Protection Patterns
@@ -81,17 +78,30 @@ spec:
 - **One Per Namespace:** Only one NamespaceLabel CR allowed per namespace
 - **Pattern Matching:** Uses Go's `filepath.Match()` for glob patterns
 
-## Status Example
+## Status Examples
 
+### Successful Application
 ```yaml
 status:
   applied: true
-  protectedLabelsSkipped: ["kubernetes.io/managed-by"]
-  labelsApplied: ["environment", "team"]
+  labelsApplied: ["environment", "team", "app"]
   conditions:
   - type: Ready
     status: "True"
     reason: Synced
-    message: "Applied 2 labels, skipped 1 protected label (kubernetes.io/managed-by)"
+    message: "Applied 3 labels to namespace 'my-app'"
+    lastTransitionTime: "2025-01-01T12:00:00Z"
+```
+
+### Protection Failure (fail mode)
+```yaml
+status:
+  applied: false
+  labelsApplied: null
+  conditions:
+  - type: Degraded
+    status: "True"
+    reason: ProtectionError
+    message: "protected label 'kubernetes.io/managed-by' cannot be modified (existing: 'existing-operator', attempted: 'my-operator')"
     lastTransitionTime: "2025-01-01T12:00:00Z"
 ``` 

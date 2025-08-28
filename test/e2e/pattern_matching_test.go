@@ -33,7 +33,7 @@ import (
 	"github.com/sbahar619/namespace-label-operator/test/utils"
 )
 
-var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), func() {
+var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, func() {
 	var (
 		k8sClient client.Client
 		ctx       context.Context
@@ -73,8 +73,23 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), func() {
 		}
 	})
 
-	Context("Complex Pattern Matching", func() {
+	Context("Nested Wildcard Pattern Tests", Ordered, func() {
+		BeforeAll(func() {
+			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
+			// Set up nested wildcard patterns once for this group
+			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
+				"*.*.k8s.io/*",
+				"*.istio.io/*",
+			})).To(Succeed())
+		})
+
+		AfterAll(func() {
+			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+		})
+
 		It("should handle nested wildcard patterns correctly", func() {
+
 			By("Pre-setting nested domain labels")
 			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "app.company.k8s.io/version", "v1.0.0")
 			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "mesh.istio.io/version", "1.17")
@@ -89,8 +104,6 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), func() {
 					"custom.app.io/owner":        "team-b", // Should be applied (not matching pattern)
 					"simple-label":               "value",  // Should be applied
 				},
-				ProtectedLabelPatterns: []string{"*.*.k8s.io/*", "*.istio.io/*"},
-				ProtectionMode:         "skip",
 			}, testNS)
 
 			By("Verifying complex pattern matching behavior")
@@ -103,7 +116,26 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), func() {
 			))
 		})
 
+	})
+
+	Context("Overlapping Kubernetes.io Pattern Tests", Ordered, func() {
+		BeforeAll(func() {
+			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
+			// Set up overlapping kubernetes.io patterns once for this group
+			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
+				"kubernetes.io/*",          // Broader pattern
+				"*.kubernetes.io/*",        // More specific pattern
+				"security.kubernetes.io/*", // Most specific pattern
+			})).To(Succeed())
+		})
+
+		AfterAll(func() {
+			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+		})
+
 		It("should handle conflicting patterns with proper precedence", func() {
+
 			By("Pre-setting labels that match multiple patterns")
 			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "security.kubernetes.io/enforce", "restricted")
 			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "other.kubernetes.io/label", "existing-value")
@@ -116,12 +148,6 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), func() {
 					"regular-label":                  "test",              // New label, no pattern match
 					"new.kubernetes.io/label":        "should-be-applied", // New label, matches pattern but no conflict
 				},
-				ProtectedLabelPatterns: []string{
-					"kubernetes.io/*",          // Broader pattern
-					"*.kubernetes.io/*",        // More specific pattern
-					"security.kubernetes.io/*", // Most specific pattern
-				},
-				ProtectionMode: "warn",
 			}, testNS)
 
 			By("Verifying conflicting labels are protected but new ones are applied")
@@ -132,20 +158,28 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), func() {
 				HaveKeyWithValue("new.kubernetes.io/label", "should-be-applied"), // Applied (new label, no conflict)
 			))
 
-			By("Verifying status reports protection correctly")
-			Eventually(func() []string {
+			By("Verifying status shows successful application")
+			Eventually(func() bool {
 				status := utils.GetCRStatus(ctx, k8sClient, "labels", testNS)()
 				if status == nil {
-					return nil
+					return false
 				}
-				return status.ProtectedLabelsSkipped
-			}, time.Minute, time.Second).Should(ContainElements(
-				"security.kubernetes.io/enforce", // Should be skipped due to conflict
-				"other.kubernetes.io/label",      // Should be skipped due to conflict
-			))
+				return status.Applied == true
+			}, time.Minute, time.Second).Should(BeTrue())
 		})
 
 		It("should handle malformed and edge case patterns gracefully", func() {
+			By("Setting up protection ConfigMap with edge case patterns")
+			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
+			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
+				"",            // Empty pattern
+				"*",           // Match everything (should block all)
+				"**/*",        // Double wildcard
+				"unicode-*",   // Pattern matching unicode-test
+				"very-long-*", // Test normal pattern
+				"should-be-*", // Pattern matching should-be-blocked
+			})).To(Succeed())
+
 			By("Creating CR with various edge case patterns")
 			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
 				Labels: map[string]string{
@@ -154,15 +188,6 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), func() {
 					"very-long-label":   "short-value",
 					"should-be-blocked": "will-be-skipped",
 				},
-				ProtectedLabelPatterns: []string{
-					"",            // Empty pattern
-					"*",           // Match everything (should block all)
-					"**/*",        // Double wildcard
-					"unicode-*",   // Pattern matching unicode-test
-					"very-long-*", // Test normal pattern
-					"should-be-*", // Pattern matching should-be-blocked
-				},
-				ProtectionMode: "skip",
 			}, testNS)
 
 			By("Verifying operator handles edge cases without crashing")

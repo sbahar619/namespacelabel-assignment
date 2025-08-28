@@ -59,6 +59,30 @@ func boolToCond(b bool) metav1.ConditionStatus {
 	return metav1.ConditionFalse
 }
 
+// isLabelProtected checks if a label key matches any of the protection patterns
+func isLabelProtected(labelKey string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if pattern == "" {
+			continue
+		}
+
+		// Handle problematic patterns
+		if strings.Contains(pattern, "**") {
+			pattern = strings.ReplaceAll(pattern, "**", "*")
+		}
+
+		// Use filepath.Match for glob pattern matching
+		matched, err := filepath.Match(pattern, labelKey)
+		if err != nil {
+			continue // Skip malformed patterns
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
 // removeStaleLabels removes labels that were previously applied by this operator but are no longer desired
 func removeStaleLabels(current, desired, prevApplied map[string]string) bool {
 	changed := false
@@ -85,88 +109,8 @@ func applyDesiredLabels(current, desired map[string]string) bool {
 	return changed
 }
 
-// isLabelProtected checks if a label key matches any of the protection patterns
-func isLabelProtected(labelKey string, protectionPatterns []string) bool {
-	for _, pattern := range protectionPatterns {
-		// Skip empty patterns
-		if pattern == "" {
-			continue
-		}
-
-		// Handle problematic patterns that might cause issues
-		// Patterns like "**/*" are not valid filepath patterns
-		if strings.Contains(pattern, "**") {
-			// Convert double wildcards to single wildcards for this context
-			pattern = strings.ReplaceAll(pattern, "**", "*")
-		}
-
-		// Use filepath.Match for glob pattern matching
-		matched, err := filepath.Match(pattern, labelKey)
-		if err != nil {
-			// If there's an error in pattern matching, log it but continue
-			// This prevents malformed patterns from breaking protection
-			continue
-		}
-		if matched {
-			return true
-		}
-	}
-	return false
-}
-
-// applyProtectionLogic processes desired labels against protection rules
-func applyProtectionLogic(
-	desired map[string]string,
-	existing map[string]string,
-	protectionPatterns []string,
-	protectionMode labelsv1alpha1.ProtectionMode,
-) ProtectionResult {
-	result := ProtectionResult{
-		AllowedLabels:    make(map[string]string),
-		ProtectedSkipped: []string{},
-		Warnings:         []string{},
-		ShouldFail:       false,
-	}
-
-	for key, value := range desired {
-		// Check if this label is protected
-		if isLabelProtected(key, protectionPatterns) {
-			existingValue, hasExisting := existing[key]
-
-			// If the label exists with a different value, apply protection
-			if hasExisting && existingValue != value {
-				msg := fmt.Sprintf("Label '%s' is protected by pattern and has existing value '%s' (attempting to set '%s')",
-					key, existingValue, value)
-
-				switch protectionMode {
-				case labelsv1alpha1.ProtectionModeFail:
-					result.ShouldFail = true
-					result.Warnings = append(result.Warnings, msg)
-					return result
-				case labelsv1alpha1.ProtectionModeWarn:
-					result.Warnings = append(result.Warnings, msg)
-					result.ProtectedSkipped = append(result.ProtectedSkipped, key)
-					continue
-				default: // ProtectionModeSkip
-					result.ProtectedSkipped = append(result.ProtectedSkipped, key)
-					continue
-				}
-			}
-
-			// Protected label with no conflict - allow it
-			// Either setting a new protected label (!hasExisting) or no change needed (existingValue == value)
-		}
-
-		// Label is either not protected or safe to apply
-		result.AllowedLabels[key] = value
-	}
-
-	return result
-}
-
-func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string, protectedSkipped, labelsApplied []string) {
+func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string, labelsApplied []string) {
 	cr.Status.Applied = ok
-	cr.Status.ProtectedLabelsSkipped = protectedSkipped
 	cr.Status.LabelsApplied = labelsApplied
 
 	// Update condition

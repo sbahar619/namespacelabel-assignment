@@ -37,6 +37,9 @@ import (
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
 )
 
+// GlobalTestClient is set by e2e test suite to provide access to the test environment client
+var GlobalTestClient client.Client
+
 // Run executes the provided command within this context
 func Run(cmd *exec.Cmd) ([]byte, error) {
 	dir, _ := GetProjectDir()

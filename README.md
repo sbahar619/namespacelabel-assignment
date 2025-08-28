@@ -46,23 +46,34 @@ metadata:
   namespace: my-app
 spec:
   labels:
+    app: my-app
     environment: production
-    kubernetes.io/managed-by: my-operator  # Will be blocked
-  
-  # Protection patterns (glob patterns)
-  protectedLabelPatterns:
+    team: backend
+```
+
+**🛡️ Admin-Controlled Protection**
+
+Cluster administrators can protect sensitive labels using a ConfigMap:
+
+```yaml
+# config/protection/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespacelabel-protection-config
+  namespace: namespacelabel-system
+data:
+  patterns: |
     - "kubernetes.io/*"
     - "*.k8s.io/*"
     - "istio.io/*"
-  
-  # Protection behavior: skip (silent) | warn (log) | fail (error)
-  protectionMode: warn
+    - "pod-security.kubernetes.io/*"
+  mode: fail  # "skip" or "fail"
 ```
 
 **Protection Modes:**
 - `skip` - Silently skip protected labels ✅ (default)
-- `warn` - Skip protected labels + log warnings ⚠️
-- `fail` - Fail entire reconciliation ❌
+- `fail` - Fail entire reconciliation with clear error ❌
 
 ## 🔧 Development
 
@@ -147,8 +158,6 @@ make uninstall   # Remove CRDs
 | Field | Type | Description |
 |-------|------|-------------|
 | `labels` | `map[string]string` | Labels to apply to namespace |
-| `protectedLabelPatterns` | `[]string` | Glob patterns for protected labels |
-| `protectionMode` | `string` | Protection behavior: `skip`/`warn`/`fail` |
 
 ### Examples
 
@@ -160,16 +169,19 @@ spec:
     environment: production
 ```
 
-**With Protection:**
+**Admin Protection ConfigMap:**
 ```yaml
-spec:
-  labels:
-    app: web-app
-    environment: production
-  protectedLabelPatterns:
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespacelabel-protection-config
+  namespace: namespacelabel-system
+data:
+  patterns: |
     - "kubernetes.io/*"
     - "istio.io/*"
-  protectionMode: warn
+    - "pod-security.kubernetes.io/*"
+  mode: fail
 ```
 
 ## 🔐 RBAC

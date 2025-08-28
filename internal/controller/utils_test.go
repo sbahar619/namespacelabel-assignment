@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -98,6 +99,71 @@ var _ = Describe("writeAppliedAnnotation", func() {
 
 		result := readAppliedAnnotation(&updatedNS)
 		Expect(result).To(Equal(appliedLabels))
+	})
+
+	It("should handle namespace fetch error", func() {
+		scheme := runtime.NewScheme()
+		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "nonexistent-ns",
+			},
+		}
+
+		appliedLabels := map[string]string{"app": "test"}
+		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to fetch namespace"))
+	})
+
+	It("should skip update when annotation value is already correct", func() {
+		scheme := runtime.NewScheme()
+		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+
+		appliedLabels := map[string]string{"app": "test"}
+		expectedJSON, _ := json.Marshal(appliedLabels)
+
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-ns",
+				Annotations: map[string]string{
+					appliedAnnoKey: string(expectedJSON),
+				},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns).Build()
+
+		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create annotations map when nil", func() {
+		scheme := runtime.NewScheme()
+		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-ns",
+				// Annotations is nil
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns).Build()
+
+		appliedLabels := map[string]string{"app": "test"}
+		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Verify annotation was created
+		var updatedNS corev1.Namespace
+		err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(ns), &updatedNS)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updatedNS.Annotations).NotTo(BeNil())
+		Expect(updatedNS.Annotations).To(HaveKey(appliedAnnoKey))
 	})
 })
 
@@ -236,96 +302,12 @@ var _ = Describe("isLabelProtected", func() {
 		Entry("multiple patterns - first matches", "k8s.io/app", []string{"k8s.io/*", "other/*"}, true),
 		Entry("multiple patterns - second matches", "istio.io/version", []string{"k8s.io/*", "istio.io/*"}, true),
 		Entry("multiple patterns - no match", "myapp/version", []string{"k8s.io/*", "istio.io/*"}, false),
+		Entry("patterns with empty strings", "kubernetes.io/test", []string{"", "kubernetes.io/*", ""}, true),
+		Entry("only empty string patterns", "kubernetes.io/test", []string{"", "", ""}, false),
+		Entry("double asterisk pattern", "kubernetes.io/test", []string{"kubernetes.io/**"}, true),
+		Entry("malformed pattern with brackets", "kubernetes.io/test", []string{"kubernetes.io/[", "kubernetes.io/*"}, true),
+		Entry("all malformed patterns", "kubernetes.io/test", []string{"[unclosed", "bad[pattern"}, false),
 	)
-})
-
-var _ = Describe("applyProtectionLogic", func() {
-	It("should skip protected labels in skip mode", func() {
-		desired := map[string]string{
-			"app":                      "myapp",
-			"kubernetes.io/managed-by": "operator",
-		}
-		existing := map[string]string{
-			"kubernetes.io/managed-by": "existing-operator",
-		}
-		patterns := []string{"kubernetes.io/*"}
-
-		result := applyProtectionLogic(desired, existing, patterns, labelsv1alpha1.ProtectionModeSkip)
-
-		Expect(result.ShouldFail).To(BeFalse())
-		Expect(result.AllowedLabels).To(HaveKeyWithValue("app", "myapp"))
-		Expect(result.AllowedLabels).NotTo(HaveKey("kubernetes.io/managed-by"))
-		Expect(result.ProtectedSkipped).To(ContainElement("kubernetes.io/managed-by"))
-		Expect(result.Warnings).To(BeEmpty())
-	})
-
-	It("should warn for protected labels in warn mode", func() {
-		desired := map[string]string{
-			"app":                      "myapp",
-			"kubernetes.io/managed-by": "operator",
-		}
-		existing := map[string]string{
-			"kubernetes.io/managed-by": "existing-operator",
-		}
-		patterns := []string{"kubernetes.io/*"}
-
-		result := applyProtectionLogic(desired, existing, patterns, labelsv1alpha1.ProtectionModeWarn)
-
-		Expect(result.ShouldFail).To(BeFalse())
-		Expect(result.AllowedLabels).To(HaveKeyWithValue("app", "myapp"))
-		Expect(result.AllowedLabels).NotTo(HaveKey("kubernetes.io/managed-by"))
-		Expect(result.ProtectedSkipped).To(ContainElement("kubernetes.io/managed-by"))
-		Expect(result.Warnings).To(HaveLen(1))
-		Expect(result.Warnings[0]).To(ContainSubstring("Label 'kubernetes.io/managed-by' is protected"))
-	})
-
-	It("should fail for protected labels in fail mode", func() {
-		desired := map[string]string{
-			"app":                      "myapp",
-			"kubernetes.io/managed-by": "operator",
-		}
-		existing := map[string]string{
-			"kubernetes.io/managed-by": "existing-operator",
-		}
-		patterns := []string{"kubernetes.io/*"}
-
-		result := applyProtectionLogic(desired, existing, patterns, labelsv1alpha1.ProtectionModeFail)
-
-		Expect(result.ShouldFail).To(BeTrue())
-		Expect(result.Warnings).To(HaveLen(1))
-		Expect(result.Warnings[0]).To(ContainSubstring("Label 'kubernetes.io/managed-by' is protected"))
-	})
-
-	It("should allow protected labels with same values", func() {
-		desired := map[string]string{
-			"kubernetes.io/managed-by": "existing-operator",
-		}
-		existing := map[string]string{
-			"kubernetes.io/managed-by": "existing-operator",
-		}
-		patterns := []string{"kubernetes.io/*"}
-
-		result := applyProtectionLogic(desired, existing, patterns, labelsv1alpha1.ProtectionModeFail)
-
-		Expect(result.ShouldFail).To(BeFalse())
-		Expect(result.AllowedLabels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
-		Expect(result.ProtectedSkipped).To(BeEmpty())
-		Expect(result.Warnings).To(BeEmpty())
-	})
-
-	It("should allow new protected labels", func() {
-		desired := map[string]string{
-			"kubernetes.io/managed-by": "operator",
-		}
-		existing := map[string]string{}
-		patterns := []string{"kubernetes.io/*"}
-
-		result := applyProtectionLogic(desired, existing, patterns, labelsv1alpha1.ProtectionModeSkip)
-
-		Expect(result.ShouldFail).To(BeFalse())
-		Expect(result.AllowedLabels).To(HaveKeyWithValue("kubernetes.io/managed-by", "operator"))
-		Expect(result.ProtectedSkipped).To(BeEmpty())
-	})
 })
 
 var _ = Describe("updateStatus", func() {
@@ -334,7 +316,7 @@ var _ = Describe("updateStatus", func() {
 			Status: labelsv1alpha1.NamespaceLabelStatus{},
 		}
 
-		updateStatus(cr, true, "Synced", "Labels applied successfully", nil, nil)
+		updateStatus(cr, true, "Synced", "Labels applied successfully", nil)
 
 		Expect(cr.Status.Applied).To(BeTrue())
 		Expect(cr.Status.Conditions).To(HaveLen(1))
@@ -351,7 +333,7 @@ var _ = Describe("updateStatus", func() {
 			Status: labelsv1alpha1.NamespaceLabelStatus{},
 		}
 
-		updateStatus(cr, false, "InvalidName", "CR must be named 'labels'", nil, nil)
+		updateStatus(cr, false, "InvalidName", "CR must be named 'labels'", nil)
 
 		Expect(cr.Status.Applied).To(BeFalse())
 		Expect(cr.Status.Conditions).To(HaveLen(1))

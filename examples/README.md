@@ -18,8 +18,24 @@ spec:
 EOF
 ```
 
-### With Protection
+### With Admin Protection
 ```bash
+# First, admin creates protection ConfigMap
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespacelabel-protection-config
+  namespace: namespacelabel-system
+data:
+  patterns: |
+    - "kubernetes.io/*"
+    - "istio.io/*"
+    - "pod-security.kubernetes.io/*"
+  mode: skip  # or "fail"
+EOF
+
+# Then users create NamespaceLabel CRs (simplified API)
 kubectl apply -f - <<EOF
 apiVersion: labels.shahaf.com/v1alpha1
 kind: NamespaceLabel
@@ -29,11 +45,8 @@ metadata:
 spec:
   labels:
     environment: production
-    kubernetes.io/managed-by: my-operator
-  protectedLabelPatterns:
-    - "kubernetes.io/*"
-    - "istio.io/*"
-  protectionMode: warn
+    team: backend
+    app: my-app
 EOF
 ```
 

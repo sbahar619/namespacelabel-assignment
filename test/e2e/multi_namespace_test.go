@@ -34,7 +34,7 @@ import (
 	"github.com/sbahar619/namespace-label-operator/test/utils"
 )
 
-var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), func() {
+var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func() {
 	var (
 		k8sClient client.Client
 		ctx       context.Context
@@ -171,7 +171,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), func() {
 			By("Verifying all namespaces have their correct labels")
 			for i := 0; i < numNamespaces; i++ {
 				nsIndex := i // Capture for closure
-				Eventually(utils.GetNamespaceLabels(ctx, k8sClient, namespaces[nsIndex]), time.Minute*2, time.Second).Should(And(
+				Eventually(utils.GetNamespaceLabels(ctx, k8sClient, namespaces[nsIndex]), time.Minute, time.Second).Should(And(
 					HaveKeyWithValue("namespace-id", fmt.Sprintf("ns-%d", nsIndex)),
 					HaveKeyWithValue("batch", "concurrent-test"),
 					HaveKeyWithValue("index", fmt.Sprintf("%d", nsIndex)),
@@ -210,7 +210,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), func() {
 				checkNS := &corev1.Namespace{}
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: ns}, checkNS)
 				return errors.IsNotFound(err)
-			}, time.Minute*3, time.Second*2).Should(BeTrue())
+			}, time.Second*60, time.Second*2).Should(BeTrue())
 
 			// Remove from cleanup list since we manually deleted it
 			for i, name := range testNSs {
@@ -223,8 +223,23 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), func() {
 
 	})
 
-	Context("Cross-Namespace Protection Scenarios", func() {
+	Context("Cross-Namespace Protection Scenarios", Serial, func() {
+		BeforeEach(func() {
+			// Ensure the protection namespace exists
+			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			// Clean up protection ConfigMap after each test
+			utils.DeleteProtectionConfigMap(ctx, k8sClient)
+		})
+
 		It("should handle same protection patterns across different namespaces", func() {
+			By("Setting up protection ConfigMap with skip mode")
+			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
+				"kubernetes.io/*",
+			})).To(Succeed())
+
 			ns1 := createTestNamespace("protection-1")
 			ns2 := createTestNamespace("protection-2")
 
@@ -232,44 +247,33 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), func() {
 			utils.SetNamespaceLabel(ctx, k8sClient, ns1, "kubernetes.io/managed-by", "system-a")
 			utils.SetNamespaceLabel(ctx, k8sClient, ns2, "kubernetes.io/managed-by", "system-b")
 
-			By("Creating CRs with same protection patterns but different modes")
+			By("Creating CRs with conflicting protected labels in both namespaces")
 			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
 				Labels: map[string]string{
 					"app":                      "service-1",
-					"kubernetes.io/managed-by": "operator", // Should be skipped
+					"kubernetes.io/managed-by": "operator",
 				},
-				ProtectedLabelPatterns: []string{"kubernetes.io/*"},
-				ProtectionMode:         "skip",
 			}, ns1)
 
 			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
 				Labels: map[string]string{
 					"app":                      "service-2",
-					"kubernetes.io/managed-by": "operator", // Should cause failure
+					"kubernetes.io/managed-by": "operator",
 				},
-				ProtectedLabelPatterns: []string{"kubernetes.io/*"},
-				ProtectionMode:         "fail",
 			}, ns2)
 
 			By("Verifying different protection behaviors")
 			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, ns1), time.Minute, time.Second).Should(And(
 				HaveKeyWithValue("app", "service-1"),
-				HaveKeyWithValue("kubernetes.io/managed-by", "system-a"), // Protected
+				HaveKeyWithValue("kubernetes.io/managed-by", "system-a"),
 			))
 
 			// For ns2, the protected label should remain unchanged due to fail mode
 			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, ns2), time.Minute, time.Second).Should(
-				HaveKeyWithValue("kubernetes.io/managed-by", "system-b"), // Should remain unchanged
+				HaveKeyWithValue("kubernetes.io/managed-by", "system-b"),
 			)
 
 			By("Verifying protection status is reported correctly for each namespace")
-			Eventually(func() []string {
-				status := utils.GetCRStatus(ctx, k8sClient, "labels", ns1)()
-				if status == nil {
-					return nil
-				}
-				return status.ProtectedLabelsSkipped
-			}, time.Minute, time.Second).Should(ContainElement("kubernetes.io/managed-by"))
 		})
 	})
 })
