@@ -38,23 +38,20 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// Handle deletion
 	if exists && current.DeletionTimestamp != nil {
 		return r.finalize(ctx, &current)
 	}
 
-	// Add finalizer if it doesn't exist and CR exists
 	if exists {
 		if !controllerutil.ContainsFinalizer(&current, FinalizerName) {
 			controllerutil.AddFinalizer(&current, FinalizerName)
 			if err := r.Update(ctx, &current); err != nil {
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil // Stop reconciliation after adding finalizer
+			return ctrl.Result{}, nil
 		}
 	}
 
-	// Target namespace is always the same as the CR's namespace for multi-tenant security
 	targetNS := req.Namespace
 
 	ns, err := r.getTargetNamespace(ctx, targetNS)
@@ -133,7 +130,6 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 	ns, err := r.getTargetNamespace(ctx, cr.Namespace)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			// Namespace is gone - just remove finalizer
 			controllerutil.RemoveFinalizer(cr, FinalizerName)
 			return ctrl.Result{}, r.Update(ctx, cr)
 		}
@@ -158,7 +154,6 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 	return ctrl.Result{}, r.Update(ctx, cr)
 }
 
-// getTargetNamespace retrieves the namespace that should be modified
 // getTargetNamespace retrieves the target namespace, creating it if it doesn't exist
 func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targetNS string) (*corev1.Namespace, error) {
 	if targetNS == "" {
@@ -172,7 +167,6 @@ func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targe
 	return &ns, nil
 }
 
-// applyLabelsToNamespace applies desired labels and removes stale ones
 // applyLabelsToNamespace applies desired labels to namespace, removing previously applied labels not in desired set
 func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, desired, prevApplied map[string]string) bool {
 	if ns.Labels == nil {
@@ -184,7 +178,6 @@ func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, 
 	return changed
 }
 
-// getProtectionConfig reads admin protection configuration from ConfigMap
 // getProtectionConfig retrieves label protection configuration from the admin ConfigMap
 func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*ProtectionConfig, error) {
 	cm := &corev1.ConfigMap{}
@@ -195,38 +188,32 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			// ConfigMap doesn't exist - return default config (no protection)
 			return &ProtectionConfig{
 				Patterns: []string{},
 				Mode:     "skip",
 			}, nil
 		}
-		// Other errors should still fail
 		return nil, fmt.Errorf("failed to read protection ConfigMap '%s/%s': %w", ProtectionNamespace, ProtectionConfigMapName, err)
 	}
 
 	config := &ProtectionConfig{
 		Patterns: []string{},
-		Mode:     "skip", // default
+		Mode:     "skip",
 	}
 
-	// Parse patterns from ConfigMap
 	if patternsData, exists := cm.Data["patterns"]; exists {
 		lines := strings.Split(patternsData, "\n")
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
 			if line != "" && !strings.HasPrefix(line, "#") {
-				// Remove inline comments (everything after #)
 				if commentIndex := strings.Index(line, "#"); commentIndex >= 0 {
 					line = line[:commentIndex]
 					line = strings.TrimSpace(line)
 				}
-				// Remove YAML list prefix if present
 				if strings.HasPrefix(line, "- ") {
 					line = strings.TrimPrefix(line, "- ")
 					line = strings.TrimSpace(line)
 				}
-				// Remove quotes if present
 				line = strings.Trim(line, "\"'")
 				if line != "" {
 					config.Patterns = append(config.Patterns, line)
@@ -235,7 +222,6 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 		}
 	}
 
-	// Parse mode from ConfigMap
 	if mode, exists := cm.Data["mode"]; exists {
 		config.Mode = strings.TrimSpace(mode)
 	}
@@ -243,7 +229,6 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 	return config, nil
 }
 
-// filterProtectedLabels applies protection rules to desired labels
 // filterProtectedLabels applies label protection rules, returning allowed labels and skipped protected labels
 func (r *NamespaceLabelReconciler) filterProtectedLabels(
 	ctx context.Context,
@@ -258,23 +243,18 @@ func (r *NamespaceLabelReconciler) filterProtectedLabels(
 		if isLabelProtected(key, config.Patterns) {
 			existingValue, hasExisting := existing[key]
 
-			// Only block if trying to CHANGE an existing protected label to a different value
 			if hasExisting && existingValue != value {
 				switch config.Mode {
 				case "fail":
 					return nil, nil, fmt.Errorf("protected label '%s' cannot be modified (existing: '%s', attempted: '%s')",
 						key, existingValue, value)
-				default: // "skip"
+				default:
 					skipped = append(skipped, key)
 					continue
 				}
 			}
-			// Allow protected labels if:
-			// - They don't exist yet (new protected labels are allowed)
-			// - They exist with the same value (no change needed)
 		}
 
-		// Label is safe to apply
 		allowed[key] = value
 	}
 
