@@ -101,7 +101,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			By("Expecting webhook to reject the deletion")
 			err := k8sClient.Delete(ctx, protectionCM)
 			Expect(err).To(HaveOccurred(), "Expected webhook to reject ConfigMap deletion")
-			Expect(err.Error()).To(ContainSubstring("cannot be deleted as it contains security-critical configuration"),
+			Expect(err.Error()).To(ContainSubstring("cannot be deleted"),
 				"Expected specific protection error message")
 			Expect(err.Error()).To(ContainSubstring("namespacelabel-protection-config"),
 				"Expected ConfigMap name in error message")

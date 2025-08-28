@@ -339,6 +339,8 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 
 		AfterAll(func() {
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			// Wait for config deletion to be processed before next context
+			time.Sleep(time.Second * 2)
 		})
 
 		It("should skip protected labels in skip mode", func() {
@@ -448,6 +450,8 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 			// Set up app.kubernetes.io protection in skip mode for this group
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			// Small delay to ensure previous context cleanup is complete
+			time.Sleep(time.Millisecond * 500)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"app.kubernetes.io/*",
 			})).To(Succeed())
@@ -471,45 +475,45 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				},
 			}, testNS)
 
-			By("Verifying the status accurately reflects applied and skipped labels")
-			Eventually(func() bool {
-				found := &labelsv1alpha1.NamespaceLabel{}
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      "labels",
-					Namespace: testNS,
-				}, found)
-				if err != nil {
-					return false
-				}
+					By("Verifying the status accurately reflects applied and skipped labels")
+		Eventually(func() bool {
+			found := &labelsv1alpha1.NamespaceLabel{}
+			err := k8sClient.Get(ctx, types.NamespacedName{
+				Name:      "labels",
+				Namespace: testNS,
+			}, found)
+			if err != nil {
+				return false
+			}
 
-				// Check applied labels - should be environment and team
-				expectedApplied := []string{"environment", "team"}
-				if len(found.Status.LabelsApplied) != len(expectedApplied) {
-					return false
-				}
-				for _, label := range expectedApplied {
-					labelFound := false
-					for _, applied := range found.Status.LabelsApplied {
-						if applied == label {
-							labelFound = true
-							break
-						}
-					}
-					if !labelFound {
-						return false
-					}
-				}
-
-				// Verify protected label is NOT in applied list (i.e., it was skipped)
+			// Check applied labels - should be environment and team
+			expectedApplied := []string{"environment", "team"}
+			if len(found.Status.LabelsApplied) != len(expectedApplied) {
+				return false
+			}
+			for _, label := range expectedApplied {
+				labelFound := false
 				for _, applied := range found.Status.LabelsApplied {
-					if applied == "app.kubernetes.io/managed-by" {
-						return false // Should not be in applied list since it was protected
+					if applied == label {
+						labelFound = true
+						break
 					}
 				}
+				if !labelFound {
+					return false
+				}
+			}
 
-				// Check overall status - should be true since some labels were applied
-				return found.Status.Applied == true
-			}, time.Minute, time.Second*2).Should(BeTrue())
+			// Verify protected label is NOT in applied list (i.e., it was skipped)
+			for _, applied := range found.Status.LabelsApplied {
+				if applied == "app.kubernetes.io/managed-by" {
+					return false // Should not be in applied list since it was protected
+				}
+			}
+
+			// Check overall status - should be true since some labels were applied
+			return found.Status.Applied == true
+		}, time.Minute, time.Second*2).Should(BeTrue())
 
 			By("Verifying the protected label on namespace remains unchanged")
 			Eventually(func() string {
