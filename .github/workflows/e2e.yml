@@ -4,9 +4,9 @@ on:
   workflow_run:
     workflows: ["Test"]
     types: [completed]
-    branches: [main, develop]  # Only run E2E for main/develop branches
+    branches: [main, develop, move-protection-api-to-cm, namespacelabel-operator]  # Only run E2E for main/develop branches
   push:
-    branches: [main, develop]  # Direct pushes to main/develop (no PR)
+    branches: [main, develop, move-protection-api-to-cm, namespacelabel-operator]  # Direct pushes to main/develop (no PR)
     paths-ignore:
       - '**.md'
       - 'docs/**'
