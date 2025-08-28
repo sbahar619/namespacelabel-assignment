@@ -23,12 +23,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	controllertypes "github.com/sbahar619/namespace-label-operator/internal/controller"
 )
 
 // validateName ensures the NamespaceLabel CR follows the singleton naming pattern
 func (v *NamespaceLabelCustomValidator) validateName(nl *labelsv1alpha1.NamespaceLabel) error {
-	if nl.Name != StandardCRName {
-		return fmt.Errorf("NamespaceLabel resource must be named '%s' for singleton pattern enforcement. Found name: '%s'", StandardCRName, nl.Name)
+	if nl.Name != controllertypes.StandardCRName {
+		return fmt.Errorf("NamespaceLabel resource must be named '%s' for singleton pattern enforcement. Found name: '%s'", controllertypes.StandardCRName, nl.Name)
 	}
 	return nil
 }

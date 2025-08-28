@@ -33,11 +33,6 @@ import (
 // nolint:unused
 var namespacelabellog = logf.Log.WithName("namespacelabel-resource")
 
-const (
-	// StandardCRName is the required name for NamespaceLabel CRs (singleton pattern)
-	StandardCRName = "labels"
-)
-
 func SetupNamespaceLabelWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&labelsv1alpha1.NamespaceLabel{}).
 		WithValidator(&NamespaceLabelCustomValidator{
