@@ -32,7 +32,6 @@ import (
 var configmaplog = logf.Log.WithName("configmap-protection")
 
 const (
-	// Protection ConfigMap details
 	ProtectionConfigMapName = "namespacelabel-protection-config"
 	ProtectionNamespace     = "namespacelabel-system"
 )
@@ -46,7 +45,6 @@ func SetupConfigMapWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// NOTE: Webhook validates delete operations for protection ConfigMap.
 // +kubebuilder:webhook:path=/validate--v1-configmap,mutating=false,failurePolicy=fail,sideEffects=None,groups="",resources=configmaps,verbs=delete,versions=v1,name=vconfigmap.kb.io,admissionReviewVersions=v1
 
 // ConfigMapProtectionValidator protects the security-critical protection ConfigMap from deletion
@@ -78,6 +76,5 @@ func (v *ConfigMapProtectionValidator) ValidateDelete(ctx context.Context, obj r
 			cm.Namespace, cm.Name)
 	}
 
-	// Allow deletion of other ConfigMaps
 	return nil, nil
 }

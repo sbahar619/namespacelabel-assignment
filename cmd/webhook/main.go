@@ -111,7 +111,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup webhooks
 	if err := webhookv1alpha1.SetupNamespaceLabelWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "NamespaceLabel")
 		os.Exit(1)

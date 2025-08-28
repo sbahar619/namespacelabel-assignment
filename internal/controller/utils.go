@@ -28,7 +28,6 @@ func readAppliedAnnotation(ns *corev1.Namespace) map[string]string {
 }
 
 func writeAppliedAnnotation(ctx context.Context, c client.Client, ns *corev1.Namespace, applied map[string]string) error {
-	// Fetch a fresh copy of the namespace to avoid conflicts with the previously updated object
 	var freshNS corev1.Namespace
 	if err := c.Get(ctx, types.NamespacedName{Name: ns.Name}, &freshNS); err != nil {
 		return fmt.Errorf("failed to fetch namespace for annotation update: %w", err)
@@ -43,9 +42,8 @@ func writeAppliedAnnotation(ctx context.Context, c client.Client, ns *corev1.Nam
 		return fmt.Errorf("marshal applied: %w", err)
 	}
 
-	// Check if annotation already has the correct value
 	if cur, ok := freshNS.Annotations[appliedAnnoKey]; ok && cur == string(b) {
-		return nil // no change needed
+		return nil
 	}
 
 	freshNS.Annotations[appliedAnnoKey] = string(b)
@@ -66,15 +64,13 @@ func isLabelProtected(labelKey string, patterns []string) bool {
 			continue
 		}
 
-		// Handle problematic patterns
 		if strings.Contains(pattern, "**") {
 			pattern = strings.ReplaceAll(pattern, "**", "*")
 		}
 
-		// Use filepath.Match for glob pattern matching
 		matched, err := filepath.Match(pattern, labelKey)
 		if err != nil {
-			continue // Skip malformed patterns
+			continue
 		}
 		if matched {
 			return true
@@ -113,7 +109,6 @@ func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string
 	cr.Status.Applied = ok
 	cr.Status.LabelsApplied = labelsApplied
 
-	// Update condition
 	cond := metav1.Condition{
 		Type:               "Ready",
 		Status:             metav1.ConditionTrue,
@@ -126,7 +121,6 @@ func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string
 		cond.Status = metav1.ConditionFalse
 	}
 
-	// Replace existing Ready condition or add new one
 	for i := range cr.Status.Conditions {
 		if cr.Status.Conditions[i].Type == "Ready" {
 			cr.Status.Conditions[i] = cond

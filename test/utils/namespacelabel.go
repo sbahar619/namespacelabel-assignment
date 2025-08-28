@@ -41,13 +41,11 @@ type CROptions struct {
 // NewNamespaceLabel builds a NamespaceLabel CR object with the given options
 // Returns the CR object without creating it in Kubernetes
 func NewNamespaceLabel(opts CROptions, namespace string) *labelsv1alpha1.NamespaceLabel {
-	// Default name to "labels" if not specified
 	name := opts.Name
 	if name == "" {
 		name = "labels"
 	}
 
-	// Create the CR
 	cr := &labelsv1alpha1.NamespaceLabel{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -144,26 +142,19 @@ func ExpectWebhookRejection(
 	err := k8sClient.Create(ctx, cr)
 
 	if err == nil {
-		// CR was created successfully - this means webhook is not rejecting it
-		// Check if this is because webhook is not running or not configured
 
-		// Try to create a duplicate with same name to trigger Kubernetes built-in validation
 		duplicate := cr.DeepCopy()
 		duplicate.ResourceVersion = ""
 		duplicateErr := k8sClient.Create(ctx, duplicate)
 
 		if duplicateErr != nil && strings.Contains(duplicateErr.Error(), "already exists") {
-			// Standard Kubernetes API rejection (webhook not running) - this is expected behavior
-			// Clean up the created CR
 			_ = k8sClient.Delete(ctx, cr)
 			return
 		}
 
-		// Clean up and fail
 		_ = k8sClient.Delete(ctx, cr)
 		panic("Expected webhook to reject the CR, but it was created successfully")
 	}
 
-	// Webhook did reject - check the error message
 	Expect(err.Error()).To(ContainSubstring(expectedErrorSubstring), "Expected specific validation error message")
 }
