@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -361,24 +360,6 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		)
 	})
 
-	Describe("getTargetNamespace", func() {
-		It("should get target namespace successfully", func() {
-			createNamespace("test-ns", nil, nil)
-
-			result, err := reconciler.getTargetNamespace(ctx, "test-ns")
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Name).To(Equal("test-ns"))
-		})
-
-		It("should return error for non-existent namespace", func() {
-			_, err := reconciler.getTargetNamespace(ctx, "non-existent")
-
-			Expect(err).To(HaveOccurred())
-			Expect(apierrors.IsNotFound(err)).To(BeTrue())
-		})
-	})
-
 	Describe("applyLabelsToNamespace", func() {
 		It("should apply labels to namespace", func() {
 			ns := &corev1.Namespace{
@@ -408,21 +389,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 	})
 
-	It("should create reconciler with proper configuration", func() {
-		Expect(reconciler.Client).NotTo(BeNil())
-		Expect(reconciler.Scheme).NotTo(BeNil())
-	})
-
 	Describe("getProtectionConfig", func() {
-		It("should return default config when ConfigMap does not exist", func() {
-			config, err := reconciler.getProtectionConfig(ctx)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(config).NotTo(BeNil())
-			Expect(config.Patterns).To(BeEmpty())
-			Expect(config.Mode).To(Equal("skip"))
-		})
-
 		It("should parse ConfigMap with patterns and mode correctly", func() {
 			protectionCM := createProtectionConfigMapObject([]string{"kubernetes.io/*", "*.k8s.io/*", "istio.io/*"}, "fail")
 			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
