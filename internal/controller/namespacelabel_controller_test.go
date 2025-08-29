@@ -57,7 +57,6 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		}
 		ctx = context.TODO()
 
-		// Create the namespacelabel-system namespace for protection ConfigMap
 		protectionNS := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ProtectionNamespace,
