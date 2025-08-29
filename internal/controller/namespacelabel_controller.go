@@ -154,10 +154,6 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 }
 
 func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targetNS string) (*corev1.Namespace, error) {
-	if targetNS == "" {
-		return nil, fmt.Errorf("empty namespace name")
-	}
-
 	var ns corev1.Namespace
 	if err := r.Get(ctx, types.NamespacedName{Name: targetNS}, &ns); err != nil {
 		return nil, err
