@@ -17,6 +17,3 @@ spec:
   
   # NOTE: The operator enforces a singleton pattern - only one NamespaceLabel CR 
   # named "labels" is allowed per namespace for operational simplicity.
-  #
-  # Label protection is now configured by cluster administrators using a ConfigMap:
-  # kubectl apply -f config/protection/configmap.yaml
