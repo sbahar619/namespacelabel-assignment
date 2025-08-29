@@ -98,21 +98,21 @@ func GetProtectionConfigMap(ctx context.Context, k8sClient client.Client) (*core
 func CreateNoProtectionConfig(ctx context.Context, k8sClient client.Client) error {
 	return CreateProtectionConfigMap(ctx, k8sClient, ProtectionConfigOptions{
 		Patterns: []string{},
-		Mode:     "skip",
+		Mode:     controller.ProtectionModeSkip,
 	})
 }
 
 func CreateSkipModeConfig(ctx context.Context, k8sClient client.Client, patterns []string) error {
 	return CreateProtectionConfigMap(ctx, k8sClient, ProtectionConfigOptions{
 		Patterns: patterns,
-		Mode:     "skip",
+		Mode:     controller.ProtectionModeSkip,
 	})
 }
 
 func CreateFailModeConfig(ctx context.Context, k8sClient client.Client, patterns []string) error {
 	return CreateProtectionConfigMap(ctx, k8sClient, ProtectionConfigOptions{
 		Patterns: patterns,
-		Mode:     "fail",
+		Mode:     controller.ProtectionModeFail,
 	})
 }
 

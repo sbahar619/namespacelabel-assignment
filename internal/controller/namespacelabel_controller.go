@@ -184,7 +184,7 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 		if apierrors.IsNotFound(err) {
 			return &ProtectionConfig{
 				Patterns: []string{},
-				Mode:     "skip",
+				Mode:     ProtectionModeSkip,
 			}, nil
 		}
 		return nil, fmt.Errorf("failed to read protection ConfigMap '%s/%s': %w", ProtectionNamespace, ProtectionConfigMapName, err)
@@ -192,7 +192,7 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 
 	config := &ProtectionConfig{
 		Patterns: []string{},
-		Mode:     "skip",
+		Mode:     ProtectionModeSkip,
 	}
 
 	if patternsData, exists := cm.Data["patterns"]; exists {
@@ -202,14 +202,14 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 	if mode, exists := cm.Data["mode"]; exists {
 		config.Mode = strings.TrimSpace(mode)
 
-		if config.Mode != "skip" && config.Mode != "fail" {
+		if config.Mode != ProtectionModeSkip && config.Mode != ProtectionModeFail {
 			l.Info("Invalid protection mode detected, defaulting to 'skip'",
 				"configuredMode", config.Mode,
-				"validModes", []string{"skip", "fail"},
-				"defaultMode", "skip",
+				"validModes", []string{ProtectionModeSkip, ProtectionModeFail},
+				"defaultMode", ProtectionModeSkip,
 				"configMap", ProtectionConfigMapName,
 				"namespace", ProtectionNamespace)
-			config.Mode = "skip"
+			config.Mode = ProtectionModeSkip
 		}
 	}
 
@@ -230,7 +230,7 @@ func (r *NamespaceLabelReconciler) filterProtectedLabels(
 
 			if hasExisting && existingValue != value {
 				switch config.Mode {
-				case "fail":
+				case ProtectionModeFail:
 					return nil, nil, fmt.Errorf("protected label '%s' cannot be modified (existing: '%s', attempted: '%s')",
 						key, existingValue, value)
 				default:

@@ -11,6 +11,9 @@ const (
 	StandardCRName          = "labels" // Standard name for NamespaceLabel CRs (singleton pattern)
 	ProtectionConfigMapName = "namespacelabel-protection-config"
 	ProtectionNamespace     = "namespacelabel-system"
+
+	ProtectionModeSkip = "skip"
+	ProtectionModeFail = "fail"
 )
 
 // NamespaceLabelReconciler reconciles a NamespaceLabel object
