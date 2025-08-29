@@ -37,8 +37,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-
-
 var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	var (
 		reconciler *NamespaceLabelReconciler
@@ -66,7 +64,6 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		}
 		Expect(fakeClient.Create(ctx, protectionNS)).To(Succeed())
 	})
-
 
 	createNamespace := func(name string, labels map[string]string, annotations map[string]string) *corev1.Namespace {
 		ns := &corev1.Namespace{
@@ -98,7 +95,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		data := map[string]string{
 			"mode": mode,
 		}
-		
+
 		if len(patterns) > 0 {
 			patternLines := make([]string, len(patterns))
 			for i, pattern := range patterns {
@@ -106,7 +103,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			}
 			data["patterns"] = strings.Join(patternLines, "\n")
 		}
-		
+
 		return &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ProtectionConfigMapName,
