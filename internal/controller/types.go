@@ -22,5 +22,5 @@ type NamespaceLabelReconciler struct {
 // ProtectionConfig holds admin-configured protection settings
 type ProtectionConfig struct {
 	Patterns []string
-	Mode     string // "skip", "fail"
+	Mode     string
 }

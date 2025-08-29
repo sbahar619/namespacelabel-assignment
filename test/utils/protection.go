@@ -24,7 +24,7 @@ const (
 // ProtectionConfigOptions defines options for creating protection ConfigMaps
 type ProtectionConfigOptions struct {
 	Patterns []string
-	Mode     string // "skip", "fail"
+	Mode     string
 }
 
 // CreateProtectionConfigMap creates or updates the protection ConfigMap with retry logic
