@@ -16,11 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	ProtectionConfigMapName = "namespacelabel-protection-config"
-	ProtectionNamespace     = "namespacelabel-system"
-)
-
 // ProtectionConfigOptions defines options for creating protection ConfigMaps
 type ProtectionConfigOptions struct {
 	Patterns []string
@@ -49,8 +44,8 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opt
 	for retries := 0; retries < 5; retries++ {
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      ProtectionConfigMapName,
-				Namespace: ProtectionNamespace,
+				Name:      controller.ProtectionConfigMapName,
+				Namespace: controller.ProtectionNamespace,
 				Labels:    labels,
 			},
 			Data: data,
@@ -64,8 +59,8 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opt
 		if apierrors.IsAlreadyExists(err) {
 			existing := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
-				Name:      ProtectionConfigMapName,
-				Namespace: ProtectionNamespace,
+				Name:      controller.ProtectionConfigMapName,
+				Namespace: controller.ProtectionNamespace,
 			}, existing)
 			if err != nil {
 				if retries < 4 {
@@ -108,8 +103,8 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opt
 func DeleteProtectionConfigMap(ctx context.Context, k8sClient client.Client) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ProtectionConfigMapName,
-			Namespace: ProtectionNamespace,
+			Name:      controller.ProtectionConfigMapName,
+			Namespace: controller.ProtectionNamespace,
 		},
 	}
 
@@ -125,7 +120,7 @@ func DeleteProtectionConfigMap(ctx context.Context, k8sClient client.Client) err
 func EnsureProtectionNamespace(ctx context.Context, k8sClient client.Client) error {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ProtectionNamespace,
+			Name: controller.ProtectionNamespace,
 		},
 	}
 
@@ -141,8 +136,8 @@ func EnsureProtectionNamespace(ctx context.Context, k8sClient client.Client) err
 func GetProtectionConfigMap(ctx context.Context, k8sClient client.Client) (*corev1.ConfigMap, error) {
 	cm := &corev1.ConfigMap{}
 	err := k8sClient.Get(ctx, types.NamespacedName{
-		Name:      ProtectionConfigMapName,
-		Namespace: ProtectionNamespace,
+		Name:      controller.ProtectionConfigMapName,
+		Namespace: controller.ProtectionNamespace,
 	}, cm)
 	return cm, err
 }

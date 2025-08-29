@@ -24,13 +24,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/sbahar619/namespace-label-operator/internal/controller"
 	"github.com/sbahar619/namespace-label-operator/test/utils"
 )
 
@@ -80,8 +80,8 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			By("Attempting to delete the protection ConfigMap")
 			protectionCM := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "namespacelabel-protection-config",
-					Namespace: "namespacelabel-system",
+					Name:      controller.ProtectionConfigMapName,
+					Namespace: controller.ProtectionNamespace,
 				},
 			}
 
@@ -90,14 +90,14 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			Expect(err).To(HaveOccurred(), "Expected webhook to reject ConfigMap deletion")
 			Expect(err.Error()).To(ContainSubstring("cannot be deleted"),
 				"Expected specific protection error message")
-			Expect(err.Error()).To(ContainSubstring("namespacelabel-protection-config"),
+			Expect(err.Error()).To(ContainSubstring(controller.ProtectionConfigMapName),
 				"Expected ConfigMap name in error message")
 
 			By("Verifying ConfigMap still exists")
 			stillExists := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
-				Name:      "namespacelabel-protection-config",
-				Namespace: "namespacelabel-system",
+				Name:      controller.ProtectionConfigMapName,
+				Namespace: controller.ProtectionNamespace,
 			}, stillExists)
 			Expect(err).NotTo(HaveOccurred(), "ConfigMap should still exist after blocked deletion")
 		})
@@ -106,8 +106,8 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			By("Attempting to delete the protection ConfigMap")
 			protectionCM := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "namespacelabel-protection-config",
-					Namespace: "namespacelabel-system",
+					Name:      controller.ProtectionConfigMapName,
+					Namespace: controller.ProtectionNamespace,
 				},
 			}
 
@@ -125,7 +125,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			otherCM := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "other-config",
-					Namespace: "namespacelabel-system",
+					Namespace: controller.ProtectionNamespace,
 				},
 				Data: map[string]string{
 					"key": "value",
@@ -141,7 +141,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			deletedCM := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "other-config",
-				Namespace: "namespacelabel-system",
+				Namespace: controller.ProtectionNamespace,
 			}, deletedCM)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "Other ConfigMap should be deleted")
 		})
@@ -150,7 +150,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			By("Creating a ConfigMap with protection name in test namespace")
 			sameName := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "namespacelabel-protection-config", // Same name!
+					Name:      controller.ProtectionConfigMapName, // Same name!
 					Namespace: testNS,                             // Different namespace
 				},
 				Data: map[string]string{
@@ -166,7 +166,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			By("Verifying the test namespace ConfigMap was deleted")
 			deletedCM := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
-				Name:      "namespacelabel-protection-config",
+				Name:      controller.ProtectionConfigMapName,
 				Namespace: testNS,
 			}, deletedCM)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "ConfigMap in test namespace should be deleted")
@@ -208,10 +208,10 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 				namespace string
 				protected bool
 			}{
-				{"namespacelabel-protection-config", "namespacelabel-system", true}, // Protected
-				{"namespacelabel-protection-config", testNS, false},                 // Same name, different namespace
-				{"other-config", "namespacelabel-system", false},                    // Different name, same namespace
-				{"other-config", testNS, false},                                     // Different name and namespace
+				{controller.ProtectionConfigMapName, controller.ProtectionNamespace, true}, // Protected
+				{controller.ProtectionConfigMapName, testNS, false},                        // Same name, different namespace
+				{"other-config", controller.ProtectionNamespace, false},                    // Different name, same namespace
+				{"other-config", testNS, false},                                            // Different name and namespace
 			}
 
 			for _, tc := range testCases {
@@ -251,7 +251,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			testCMs := []*corev1.ConfigMap{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "namespacelabel-protection-config",
+						Name:      controller.ProtectionConfigMapName,
 						Namespace: testNS, // Different namespace
 					},
 					Data: map[string]string{"test": "create"},
@@ -259,7 +259,7 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "other-config",
-						Namespace: "namespacelabel-system", // Same namespace, different name
+						Namespace: controller.ProtectionNamespace, // Same namespace, different name
 					},
 					Data: map[string]string{"test": "create"},
 				},

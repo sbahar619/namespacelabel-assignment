@@ -27,14 +27,11 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/sbahar619/namespace-label-operator/internal/controller"
 )
 
 var configmaplog = logf.Log.WithName("configmap-protection")
-
-const (
-	ProtectionConfigMapName = "namespacelabel-protection-config"
-	ProtectionNamespace     = "namespacelabel-system"
-)
 
 // SetupConfigMapWebhookWithManager configures the ConfigMap protection webhook
 func SetupConfigMapWebhookWithManager(mgr ctrl.Manager) error {
@@ -68,7 +65,7 @@ func (v *ConfigMapProtectionValidator) ValidateDelete(ctx context.Context, obj r
 		return nil, fmt.Errorf("expected a ConfigMap object but got %T", obj)
 	}
 
-	if cm.Name == ProtectionConfigMapName && cm.Namespace == ProtectionNamespace {
+	if cm.Name == controller.ProtectionConfigMapName && cm.Namespace == controller.ProtectionNamespace {
 		configmaplog.Info("Protection ConfigMap deletion attempt blocked",
 			"configMap", fmt.Sprintf("%s/%s", cm.Namespace, cm.Name))
 
