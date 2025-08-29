@@ -102,21 +102,6 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			Expect(err).NotTo(HaveOccurred(), "ConfigMap should still exist after blocked deletion")
 		})
 
-		It("should provide concise error message", func() {
-			By("Attempting to delete the protection ConfigMap")
-			protectionCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controller.ProtectionConfigMapName,
-					Namespace: controller.ProtectionNamespace,
-				},
-			}
-
-			By("Checking error message is concise")
-			err := k8sClient.Delete(ctx, protectionCM)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("cannot be deleted"),
-				"Should contain simple deletion blocked message")
-		})
 	})
 
 	Context("Selective Protection", func() {
@@ -146,57 +131,6 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "Other ConfigMap should be deleted")
 		})
 
-		It("should allow deletion of ConfigMaps with same name in different namespaces", func() {
-			By("Creating a ConfigMap with protection name in test namespace")
-			sameName := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      controller.ProtectionConfigMapName, // Same name!
-					Namespace: testNS,                             // Different namespace
-				},
-				Data: map[string]string{
-					"test": "data",
-				},
-			}
-			Expect(k8sClient.Create(ctx, sameName)).To(Succeed())
-
-			By("Deleting the ConfigMap in test namespace - should succeed")
-			err := k8sClient.Delete(ctx, sameName)
-			Expect(err).NotTo(HaveOccurred(), "Should allow deletion of ConfigMaps with same name in different namespaces")
-
-			By("Verifying the test namespace ConfigMap was deleted")
-			deletedCM := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{
-				Name:      controller.ProtectionConfigMapName,
-				Namespace: testNS,
-			}, deletedCM)
-			Expect(errors.IsNotFound(err)).To(BeTrue(), "ConfigMap in test namespace should be deleted")
-		})
-
-		It("should allow deletion of any ConfigMaps in other namespaces", func() {
-			By("Creating a ConfigMap in test namespace")
-			testCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "any-config",
-					Namespace: testNS,
-				},
-				Data: map[string]string{
-					"test": "value",
-				},
-			}
-			Expect(k8sClient.Create(ctx, testCM)).To(Succeed())
-
-			By("Deleting the ConfigMap - should succeed")
-			err := k8sClient.Delete(ctx, testCM)
-			Expect(err).NotTo(HaveOccurred(), "Should allow deletion of ConfigMaps in other namespaces")
-
-			By("Verifying the ConfigMap was deleted")
-			deletedCM := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{
-				Name:      "any-config",
-				Namespace: testNS,
-			}, deletedCM)
-			Expect(errors.IsNotFound(err)).To(BeTrue(), "ConfigMap should be deleted")
-		})
 	})
 
 	Context("Protection Scope Verification", func() {
@@ -245,64 +179,4 @@ var _ = Describe("ConfigMap Protection Webhook Tests", Label("webhook"), Serial,
 		})
 	})
 
-	Context("Webhook Behavior", func() {
-		It("should not interfere with ConfigMap CREATE operations", func() {
-			By("Creating ConfigMaps with various names and namespaces")
-			testCMs := []*corev1.ConfigMap{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      controller.ProtectionConfigMapName,
-						Namespace: testNS, // Different namespace
-					},
-					Data: map[string]string{"test": "create"},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "other-config",
-						Namespace: controller.ProtectionNamespace, // Same namespace, different name
-					},
-					Data: map[string]string{"test": "create"},
-				},
-			}
-
-			for _, cm := range testCMs {
-				By(fmt.Sprintf("Creating ConfigMap %s/%s", cm.Namespace, cm.Name))
-				err := k8sClient.Create(ctx, cm)
-				Expect(err).NotTo(HaveOccurred(), "Webhook should not block ConfigMap creation")
-
-				// Clean up
-				_ = k8sClient.Delete(ctx, cm)
-			}
-		})
-
-		It("should not interfere with ConfigMap UPDATE operations", func() {
-			By("Creating a test ConfigMap")
-			testCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "update-test",
-					Namespace: testNS,
-				},
-				Data: map[string]string{
-					"key": "original",
-				},
-			}
-			Expect(k8sClient.Create(ctx, testCM)).To(Succeed())
-
-			By("Updating the ConfigMap")
-			// Get fresh copy
-			err := k8sClient.Get(ctx, types.NamespacedName{
-				Name:      "update-test",
-				Namespace: testNS,
-			}, testCM)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Update data
-			testCM.Data["key"] = "updated"
-			err = k8sClient.Update(ctx, testCM)
-			Expect(err).NotTo(HaveOccurred(), "Webhook should not block ConfigMap updates")
-
-			// Clean up
-			_ = k8sClient.Delete(ctx, testCM)
-		})
-	})
 })

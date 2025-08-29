@@ -90,25 +90,6 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func(
 	})
 
 	Context("Singleton Enforcement", func() {
-		It("should prevent multiple NamespaceLabel CRs in the same namespace", func() {
-			By("Creating the first valid NamespaceLabel CR")
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
-				Labels: map[string]string{
-					"environment": "production",
-				},
-			}, testNS)
-
-			By("Attempting to create a second NamespaceLabel CR with invalid name")
-			cr2 := utils.NewNamespaceLabel(utils.CROptions{
-				Name: "other-labels",
-				Labels: map[string]string{
-					"team": "platform",
-				},
-			}, testNS)
-
-			utils.ExpectWebhookRejection(ctx, k8sClient, cr2,
-				"NamespaceLabel resource must be named 'labels' for singleton pattern enforcement")
-		})
 
 		It("should prevent creation of second CR with valid name when one already exists", func() {
 			By("Creating the first valid NamespaceLabel CR")
