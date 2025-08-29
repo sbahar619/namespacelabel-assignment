@@ -79,19 +79,9 @@ CA_BUNDLE=$(base64 < ca.crt | tr -d '\n')
 
 if [ -n "$WEBHOOK_CONFIG" ]; then
     echo "🔧 Updating $WEBHOOK_CONFIG with CA bundle..."
-    
-    # Get the number of webhooks
-    WEBHOOK_COUNT=$(kubectl get "$WEBHOOK_CONFIG" -o jsonpath='{.webhooks[*].name}' | wc -w)
-    echo "   Found $WEBHOOK_COUNT webhook(s) to update"
-    
-    # Update CA bundle for all webhooks
-    for ((i=0; i<WEBHOOK_COUNT; i++)); do
-        WEBHOOK_NAME=$(kubectl get "$WEBHOOK_CONFIG" -o jsonpath="{.webhooks[$i].name}")
-        echo "   Updating webhook[$i]: $WEBHOOK_NAME"
-        kubectl patch "$WEBHOOK_CONFIG" \
-            --type='json' \
-            -p="[{'op': 'replace', 'path': '/webhooks/$i/clientConfig/caBundle', 'value': '$CA_BUNDLE'}]"
-    done
+    kubectl patch "$WEBHOOK_CONFIG" \
+        --type='json' \
+        -p="[{'op': 'replace', 'path': '/webhooks/0/clientConfig/caBundle', 'value': '$CA_BUNDLE'}]"
 else
     echo "⚠️  No ValidatingWebhookConfiguration found after 60 seconds."
     echo "   The webhook may not be configured for validation."

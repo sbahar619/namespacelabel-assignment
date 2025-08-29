@@ -8,26 +8,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
-      namespace: system
-      path: /validate--v1-configmap
-  failurePolicy: Fail
-  name: vconfigmap.kb.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - DELETE
-    resources:
-    - configmaps
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
+      name: namespacelabel-webhook-service
       namespace: system
       path: /validate-labels-shahaf-com-v1alpha1-namespacelabel
   failurePolicy: Fail
