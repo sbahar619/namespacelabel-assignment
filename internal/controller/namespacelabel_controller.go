@@ -202,24 +202,7 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 	}
 
 	if patternsData, exists := cm.Data["patterns"]; exists {
-		lines := strings.Split(patternsData, "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line != "" && !strings.HasPrefix(line, "#") {
-				if commentIndex := strings.Index(line, "#"); commentIndex >= 0 {
-					line = line[:commentIndex]
-					line = strings.TrimSpace(line)
-				}
-				if strings.HasPrefix(line, "- ") {
-					line = strings.TrimPrefix(line, "- ")
-					line = strings.TrimSpace(line)
-				}
-				line = strings.Trim(line, "\"'")
-				if line != "" {
-					config.Patterns = append(config.Patterns, line)
-				}
-			}
-		}
+		config.Patterns = ParseConfigMapPatterns(patternsData)
 	}
 
 	if mode, exists := cm.Data["mode"]; exists {

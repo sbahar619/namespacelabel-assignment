@@ -129,3 +129,31 @@ func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string
 	}
 	cr.Status.Conditions = append(cr.Status.Conditions, cond)
 }
+
+// ParseConfigMapPatterns parses patterns from ConfigMap data
+func ParseConfigMapPatterns(patternsData string) []string {
+	if patternsData == "" {
+		return []string{}
+	}
+
+	var patterns []string
+	lines := strings.Split(patternsData, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			if commentIndex := strings.Index(line, "#"); commentIndex >= 0 {
+				line = line[:commentIndex]
+				line = strings.TrimSpace(line)
+			}
+			if strings.HasPrefix(line, "- ") {
+				line = strings.TrimPrefix(line, "- ")
+				line = strings.TrimSpace(line)
+			}
+			line = strings.Trim(line, "\"'")
+			if line != "" {
+				patterns = append(patterns, line)
+			}
+		}
+	}
+	return patterns
+}

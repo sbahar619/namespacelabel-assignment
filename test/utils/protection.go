@@ -8,6 +8,7 @@ import (
 	"time"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"github.com/sbahar619/namespace-label-operator/internal/controller"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -270,26 +271,5 @@ func formatPatternsForComparison(patterns []string) string {
 
 // parseConfigMapPatterns parses patterns from ConfigMap data format
 func parseConfigMapPatterns(patternsData string) []string {
-	if patternsData == "" {
-		return []string{}
-	}
-
-	var patterns []string
-	lines := strings.Split(patternsData, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "#") {
-			// Remove YAML list prefix if present
-			if strings.HasPrefix(line, "- ") {
-				line = strings.TrimPrefix(line, "- ")
-				line = strings.TrimSpace(line)
-			}
-			// Remove quotes if present
-			line = strings.Trim(line, "\"'")
-			if line != "" {
-				patterns = append(patterns, line)
-			}
-		}
-	}
-	return patterns
+	return controller.ParseConfigMapPatterns(patternsData)
 }
