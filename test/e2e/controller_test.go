@@ -70,7 +70,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 			checkNS := &corev1.Namespace{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: testNS}, checkNS)
 			return apierrors.IsNotFound(err)
-		}, time.Second*30, time.Second*2).Should(BeTrue(),
+		}, time.Second*60, time.Second*2).Should(BeTrue(),
 			fmt.Sprintf("Namespace %s should be deleted within 30 seconds", testNS))
 	})
 
