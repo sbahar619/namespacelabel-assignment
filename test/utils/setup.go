@@ -26,7 +26,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -39,6 +41,30 @@ import (
 
 // GlobalTestClient is set by e2e test suite to provide access to the test environment client
 var GlobalTestClient client.Client
+
+// CreateTestNamespace creates a test namespace with the given name and optional labels
+func CreateTestNamespace(
+	ctx context.Context, k8sClient client.Client, name string, labels map[string]string,
+) *corev1.Namespace {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+	}
+	Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+	return ns
+}
+
+// DeleteTestNamespace deletes a test namespace with the given name
+func DeleteTestNamespace(ctx context.Context, k8sClient client.Client, name string) {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	_ = k8sClient.Delete(ctx, ns) // Ignore errors since this is cleanup
+}
 
 // Run executes the provided command within this context
 func Run(cmd *exec.Cmd) ([]byte, error) {

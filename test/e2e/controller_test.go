@@ -53,12 +53,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating test namespace")
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNS,
-			},
-		}
-		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		utils.CreateTestNamespace(ctx, k8sClient, testNS, nil)
 	})
 
 	AfterEach(func() {
@@ -68,16 +63,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		utils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
 
 		By("Deleting the test namespace")
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNS,
-			},
-		}
-		err := k8sClient.Delete(ctx, ns)
-		if err != nil && !apierrors.IsNotFound(err) {
-			fmt.Printf("Warning: failed to delete namespace %s: %v\n", testNS, err)
-			return // Skip waiting if delete failed
-		}
+		utils.DeleteTestNamespace(ctx, k8sClient, testNS)
 
 		By("Waiting for namespace to be fully deleted")
 		Eventually(func() bool {

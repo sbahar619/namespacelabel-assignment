@@ -362,14 +362,9 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 	Describe("applyLabelsToNamespace", func() {
 		It("should apply labels to namespace", func() {
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ns",
-					Labels: map[string]string{
-						"existing": "label",
-					},
-				},
-			}
+			ns := createNamespace("test-ns", map[string]string{
+				"existing": "label",
+			}, nil)
 
 			desired := map[string]string{
 				"new":     "label",

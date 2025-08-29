@@ -24,10 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sbahar619/namespace-label-operator/test/utils"
@@ -50,27 +46,14 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating test namespace")
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNS,
-			},
-		}
-		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		utils.CreateTestNamespace(ctx, k8sClient, testNS, nil)
 	})
 
 	AfterEach(func() {
 		By("Cleaning up test namespace")
 		utils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
 
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testNS,
-			},
-		}
-		err := k8sClient.Delete(ctx, ns)
-		if err != nil && !errors.IsNotFound(err) {
-			fmt.Printf("Warning: failed to delete namespace %s: %v\n", testNS, err)
-		}
+		utils.DeleteTestNamespace(ctx, k8sClient, testNS)
 	})
 
 	Context("Nested Wildcard Pattern Tests", Ordered, func() {

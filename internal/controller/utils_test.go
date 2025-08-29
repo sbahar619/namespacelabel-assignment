@@ -32,6 +32,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// Test utility functions for namespace creation
+func createTestNamespace(name string, annotations map[string]string) *corev1.Namespace {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Annotations: annotations,
+		},
+	}
+	return ns
+}
+
 // Tests for functions in utils.go
 
 var _ = Describe("readAppliedAnnotation", Label("controller"), func() {
@@ -75,12 +86,7 @@ var _ = Describe("writeAppliedAnnotation", func() {
 		scheme := runtime.NewScheme()
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        "test-ns",
-				Annotations: make(map[string]string),
-			},
-		}
+		ns := createTestNamespace("test-ns", make(map[string]string))
 
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns).Build()
 
@@ -107,11 +113,7 @@ var _ = Describe("writeAppliedAnnotation", func() {
 
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "nonexistent-ns",
-			},
-		}
+		ns := createTestNamespace("nonexistent-ns", nil)
 
 		appliedLabels := map[string]string{"app": "test"}
 		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
@@ -126,14 +128,9 @@ var _ = Describe("writeAppliedAnnotation", func() {
 		appliedLabels := map[string]string{"app": "test"}
 		expectedJSON, _ := json.Marshal(appliedLabels)
 
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-ns",
-				Annotations: map[string]string{
-					appliedAnnoKey: string(expectedJSON),
-				},
-			},
-		}
+		ns := createTestNamespace("test-ns", map[string]string{
+			appliedAnnoKey: string(expectedJSON),
+		})
 
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns).Build()
 
@@ -145,12 +142,7 @@ var _ = Describe("writeAppliedAnnotation", func() {
 		scheme := runtime.NewScheme()
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-ns",
-				// Annotations is nil
-			},
-		}
+		ns := createTestNamespace("test-ns", nil)
 
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns).Build()
 

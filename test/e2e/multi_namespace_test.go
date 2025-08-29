@@ -56,15 +56,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 		for _, ns := range testNSs {
 			utils.CleanupNamespaceLabels(ctx, k8sClient, ns)
 
-			nsObj := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ns,
-				},
-			}
-			err := k8sClient.Delete(ctx, nsObj)
-			if err != nil && !errors.IsNotFound(err) {
-				fmt.Printf("Warning: failed to delete namespace %s: %v\n", ns, err)
-			}
+			utils.DeleteTestNamespace(ctx, k8sClient, ns)
 		}
 	})
 
@@ -72,12 +64,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 		nsName := fmt.Sprintf("multi-test-%s-%d-%d", suffix, time.Now().UnixNano(), rand.Int31())
 		testNSs = append(testNSs, nsName)
 
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nsName,
-			},
-		}
-		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		utils.CreateTestNamespace(ctx, k8sClient, nsName, nil)
 		return nsName
 	}
 
