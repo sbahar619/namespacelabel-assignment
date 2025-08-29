@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Test utility functions for namespace creation
 func createTestNamespace(name string, annotations map[string]string) *corev1.Namespace {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -42,8 +41,6 @@ func createTestNamespace(name string, annotations map[string]string) *corev1.Nam
 	}
 	return ns
 }
-
-// Tests for functions in utils.go
 
 var _ = Describe("readAppliedAnnotation", Label("controller"), func() {
 	DescribeTable("annotation parsing scenarios",
@@ -98,7 +95,6 @@ var _ = Describe("writeAppliedAnnotation", func() {
 		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify the annotation was written
 		var updatedNS corev1.Namespace
 		err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(ns), &updatedNS)
 		Expect(err).NotTo(HaveOccurred())
@@ -150,7 +146,6 @@ var _ = Describe("writeAppliedAnnotation", func() {
 		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Verify annotation was created
 		var updatedNS corev1.Namespace
 		err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(ns), &updatedNS)
 		Expect(err).NotTo(HaveOccurred())
@@ -206,7 +201,6 @@ var _ = Describe("removeStaleLabels", func() {
 		prevApplied := map[string]string{
 			"app":     "myapp",
 			"version": "v1.0",
-			// user-label was never applied by operator
 		}
 
 		changed := removeStaleLabels(current, desired, prevApplied)

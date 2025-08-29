@@ -104,7 +104,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 	Context("Overlapping Kubernetes.io Pattern Tests", Ordered, func() {
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			// Set up overlapping kubernetes.io patterns once for this group
+
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"kubernetes.io/*",          // Broader pattern
@@ -180,7 +180,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 			}, time.Minute, time.Second).Should(BeTrue())
 
 			By("Verifying labels are applied correctly (protection only affects existing+conflicting labels)")
-			// Since these are NEW labels, patterns don't block them - only existing conflicts are blocked
+
 			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, testNS), time.Minute, time.Second).Should(And(
 				HaveKeyWithValue("test-label", "value"),                  // Applied (new label)
 				HaveKeyWithValue("unicode-test", "test-value"),           // Applied (new label)

@@ -44,7 +44,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		// Use nanoseconds and random number to avoid collisions
+
 		testNS = fmt.Sprintf("controller-test-%d-%d", time.Now().UnixNano(), rand.Int31())
 
 		By("Setting up Kubernetes client")
@@ -132,7 +132,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 	Context("No Protection Tests", Ordered, func() {
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			// Set up no protection once for all tests in this group
+
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateNoProtectionConfig(ctx, k8sClient)).To(Succeed())
 		})
@@ -166,7 +166,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 	Context("System.io Protection Tests", Ordered, func() {
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			// Set up system.io protection once for all tests in this group
+
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"system.io/*",
@@ -194,21 +194,19 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 
 			By("Triggering multiple rapid reconciliations by updating the CR")
 			for i := 0; i < 5; i++ {
-				// Use Eventually with retry logic to handle resource version conflicts
+
 				Eventually(func() error {
-					// Get fresh copy of the CR to avoid resource version conflicts
+
 					freshCR := &labelsv1alpha1.NamespaceLabel{}
 					if err := k8sClient.Get(ctx, types.NamespacedName{Name: "labels", Namespace: testNS}, freshCR); err != nil {
 						return err
 					}
 
-					// Update the counter to trigger reconciliation
 					freshCR.Spec.Labels["update-counter"] = fmt.Sprintf("update-%d", i)
 					return k8sClient.Update(ctx, freshCR)
 				}, time.Second*10, time.Millisecond*100).Should(Succeed(),
 					fmt.Sprintf("Should be able to update CR for iteration %d", i))
 
-				// Small delay to allow controller processing
 				time.Sleep(time.Millisecond * 200)
 			}
 
@@ -252,7 +250,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 	Context("Kubernetes.io Fail Mode Tests", Ordered, func() {
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			// Set up kubernetes.io protection in fail mode for this group
+
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateFailModeConfig(ctx, k8sClient, []string{
 				"kubernetes.io/*",
@@ -287,7 +285,6 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 					return false
 				}
 
-				// Check for failure condition
 				for _, condition := range found.Status.Conditions {
 					if condition.Type == "Ready" && condition.Status == metav1.ConditionFalse {
 						return true
@@ -312,7 +309,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 	Context("Istio.io Skip Mode Tests", Ordered, func() {
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			// Set up istio.io protection in skip mode for this group
+
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"istio.io/*",
@@ -321,7 +318,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 
 		AfterAll(func() {
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
-			// Wait for config deletion to be processed before next context
+
 			time.Sleep(time.Second * 2)
 		})
 
@@ -388,7 +385,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				freshCR.Spec.Labels = map[string]string{
 					"environment": "production", // Changed value
 					"tier":        "critical",   // New label
-					// "version" removed
+
 				}
 				return k8sClient.Update(ctx, freshCR)
 			}, time.Second*10, time.Millisecond*100).Should(Succeed())
@@ -430,9 +427,9 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 	Context("App.kubernetes.io Status Tests", Ordered, func() {
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			// Set up app.kubernetes.io protection in skip mode for this group
+
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
-			// Small delay to ensure previous context cleanup is complete
+
 			time.Sleep(time.Millisecond * 500)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"app.kubernetes.io/*",
@@ -468,7 +465,6 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 					return false
 				}
 
-				// Check applied labels - should be environment and team
 				expectedApplied := []string{"environment", "team"}
 				if len(found.Status.LabelsApplied) != len(expectedApplied) {
 					return false
@@ -486,14 +482,12 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 					}
 				}
 
-				// Verify protected label is NOT in applied list (i.e., it was skipped)
 				for _, applied := range found.Status.LabelsApplied {
 					if applied == "app.kubernetes.io/managed-by" {
 						return false // Should not be in applied list since it was protected
 					}
 				}
 
-				// Check overall status - should be true since some labels were applied
 				return found.Status.Applied == true
 			}, time.Minute, time.Second*2).Should(BeTrue())
 

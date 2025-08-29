@@ -123,7 +123,6 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{}, nil
 }
 
-// finalize handles NamespaceLabel deletion by removing applied labels from the target namespace
 func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alpha1.NamespaceLabel) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
 
@@ -154,7 +153,6 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 	return ctrl.Result{}, r.Update(ctx, cr)
 }
 
-// getTargetNamespace retrieves the target namespace, creating it if it doesn't exist
 func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targetNS string) (*corev1.Namespace, error) {
 	if targetNS == "" {
 		return nil, fmt.Errorf("empty namespace name")
@@ -167,7 +165,6 @@ func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targe
 	return &ns, nil
 }
 
-// applyLabelsToNamespace applies desired labels to namespace, removing previously applied labels not in desired set
 func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, desired, prevApplied map[string]string) bool {
 	if ns.Labels == nil {
 		ns.Labels = make(map[string]string)
@@ -178,7 +175,6 @@ func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, 
 	return changed
 }
 
-// getProtectionConfig retrieves label protection configuration from the admin ConfigMap
 func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*ProtectionConfig, error) {
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{
@@ -212,7 +208,6 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 	return config, nil
 }
 
-// filterProtectedLabels applies label protection rules, returning allowed labels and skipped protected labels
 func (r *NamespaceLabelReconciler) filterProtectedLabels(
 	desired map[string]string,
 	existing map[string]string,

@@ -13,13 +13,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ProtectionConfigOptions defines options for creating protection ConfigMaps
 type ProtectionConfigOptions struct {
 	Patterns []string
 	Mode     string
 }
 
-// CreateProtectionConfigMap creates or updates the protection ConfigMap
 func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, opts ProtectionConfigOptions) error {
 	cm := buildConfigMap(opts)
 
@@ -97,7 +95,6 @@ func GetProtectionConfigMap(ctx context.Context, k8sClient client.Client) (*core
 	return cm, err
 }
 
-// CreateNoProtectionConfig creates a ConfigMap that disables all protection
 func CreateNoProtectionConfig(ctx context.Context, k8sClient client.Client) error {
 	return CreateProtectionConfigMap(ctx, k8sClient, ProtectionConfigOptions{
 		Patterns: []string{},
@@ -105,7 +102,6 @@ func CreateNoProtectionConfig(ctx context.Context, k8sClient client.Client) erro
 	})
 }
 
-// CreateSkipModeConfig creates a ConfigMap with skip mode and the given patterns
 func CreateSkipModeConfig(ctx context.Context, k8sClient client.Client, patterns []string) error {
 	return CreateProtectionConfigMap(ctx, k8sClient, ProtectionConfigOptions{
 		Patterns: patterns,
@@ -113,7 +109,6 @@ func CreateSkipModeConfig(ctx context.Context, k8sClient client.Client, patterns
 	})
 }
 
-// CreateFailModeConfig creates a ConfigMap with fail mode and the given patterns
 func CreateFailModeConfig(ctx context.Context, k8sClient client.Client, patterns []string) error {
 	return CreateProtectionConfigMap(ctx, k8sClient, ProtectionConfigOptions{
 		Patterns: patterns,
@@ -121,7 +116,6 @@ func CreateFailModeConfig(ctx context.Context, k8sClient client.Client, patterns
 	})
 }
 
-// CreateDefaultProtectionConfig creates a ConfigMap with standard protection patterns in fail mode
 func CreateDefaultProtectionConfig(ctx context.Context, k8sClient client.Client) error {
 	return CreateFailModeConfig(ctx, k8sClient, []string{
 		"kubernetes.io/*",

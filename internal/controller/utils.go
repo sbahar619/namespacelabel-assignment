@@ -57,7 +57,6 @@ func boolToCond(b bool) metav1.ConditionStatus {
 	return metav1.ConditionFalse
 }
 
-// isLabelProtected checks if a label key matches any of the protection patterns
 func isLabelProtected(labelKey string, patterns []string) bool {
 	for _, pattern := range patterns {
 		if pattern == "" {
@@ -79,7 +78,6 @@ func isLabelProtected(labelKey string, patterns []string) bool {
 	return false
 }
 
-// removeStaleLabels removes labels that were previously applied by this operator but are no longer desired
 func removeStaleLabels(current, desired, prevApplied map[string]string) bool {
 	changed := false
 	for key, prevVal := range prevApplied {
@@ -93,7 +91,6 @@ func removeStaleLabels(current, desired, prevApplied map[string]string) bool {
 	return changed
 }
 
-// applyDesiredLabels sets or updates labels to their desired values
 func applyDesiredLabels(current, desired map[string]string) bool {
 	changed := false
 	for key, val := range desired {
@@ -130,7 +127,6 @@ func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string
 	cr.Status.Conditions = append(cr.Status.Conditions, cond)
 }
 
-// parseConfigMapPatterns parses patterns from ConfigMap data
 func parseConfigMapPatterns(patternsData string) []string {
 	if patternsData == "" {
 		return []string{}

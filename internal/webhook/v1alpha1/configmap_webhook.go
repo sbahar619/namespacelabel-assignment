@@ -33,7 +33,6 @@ import (
 
 var configmaplog = logf.Log.WithName("configmap-protection")
 
-// SetupConfigMapWebhookWithManager configures the ConfigMap protection webhook
 func SetupConfigMapWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&corev1.ConfigMap{}).
 		WithValidator(&ConfigMapProtectionValidator{
@@ -44,7 +43,6 @@ func SetupConfigMapWebhookWithManager(mgr ctrl.Manager) error {
 
 // +kubebuilder:webhook:path=/validate--v1-configmap,mutating=false,failurePolicy=fail,sideEffects=None,groups="",resources=configmaps,verbs=delete,versions=v1,name=vconfigmap.kb.io,admissionReviewVersions=v1
 
-// ConfigMapProtectionValidator protects the security-critical protection ConfigMap from deletion
 type ConfigMapProtectionValidator struct {
 	Client client.Client
 }

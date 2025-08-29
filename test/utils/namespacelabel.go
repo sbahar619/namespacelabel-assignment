@@ -32,14 +32,11 @@ import (
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
 )
 
-// CROptions provides options for creating NamespaceLabel CRs
 type CROptions struct {
 	Name   string
 	Labels map[string]string
 }
 
-// NewNamespaceLabel builds a NamespaceLabel CR object with the given options
-// Returns the CR object without creating it in Kubernetes
 func NewNamespaceLabel(opts CROptions, namespace string) *labelsv1alpha1.NamespaceLabel {
 	name := opts.Name
 	if name == "" {
@@ -59,8 +56,6 @@ func NewNamespaceLabel(opts CROptions, namespace string) *labelsv1alpha1.Namespa
 	return cr
 }
 
-// CreateNamespaceLabel creates a NamespaceLabel CR in Kubernetes and expects it to succeed
-// Returns the created CR object for further operations (like deletion)
 func CreateNamespaceLabel(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -72,7 +67,6 @@ func CreateNamespaceLabel(
 	return cr
 }
 
-// WaitForCRToExist waits for a CR to be created and accessible
 func WaitForCRToExist(ctx context.Context, k8sClient client.Client, name, namespace string) {
 	Eventually(func() error {
 		found := &labelsv1alpha1.NamespaceLabel{}
@@ -83,7 +77,6 @@ func WaitForCRToExist(ctx context.Context, k8sClient client.Client, name, namesp
 	}, time.Minute, time.Second).Should(Succeed())
 }
 
-// GetCRStatus returns a function that gets the CR status
 func GetCRStatus(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -99,7 +92,6 @@ func GetCRStatus(
 	}
 }
 
-// GetNamespaceLabels returns a function that gets the current labels on the specified namespace
 func GetNamespaceLabels(ctx context.Context, k8sClient client.Client, namespace string) func() map[string]string {
 	return func() map[string]string {
 		ns := &corev1.Namespace{}
@@ -111,7 +103,6 @@ func GetNamespaceLabels(ctx context.Context, k8sClient client.Client, namespace 
 	}
 }
 
-// SetNamespaceLabel sets a label on the specified namespace (handles label map initialization)
 func SetNamespaceLabel(ctx context.Context, k8sClient client.Client, namespace, key, value string) {
 	ns := &corev1.Namespace{}
 	Expect(k8sClient.Get(ctx, types.NamespacedName{Name: namespace}, ns)).To(Succeed())
@@ -122,8 +113,6 @@ func SetNamespaceLabel(ctx context.Context, k8sClient client.Client, namespace, 
 	Expect(k8sClient.Update(ctx, ns)).To(Succeed())
 }
 
-// ExpectWebhookRejection expects webhook to reject CR creation with specific error
-// If webhook is not available, it expects standard Kubernetes validation
 func ExpectWebhookRejection(
 	ctx context.Context,
 	k8sClient client.Client,
