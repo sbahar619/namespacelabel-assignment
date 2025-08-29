@@ -202,7 +202,7 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 	}
 
 	if patternsData, exists := cm.Data["patterns"]; exists {
-		config.Patterns = ParseConfigMapPatterns(patternsData)
+		config.Patterns = parseConfigMapPatterns(patternsData)
 	}
 
 	if mode, exists := cm.Data["mode"]; exists {

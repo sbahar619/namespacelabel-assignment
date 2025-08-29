@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/sbahar619/namespace-label-operator/internal/controller"
 	corev1 "k8s.io/api/core/v1"
@@ -130,9 +129,4 @@ func CreateDefaultProtectionConfig(ctx context.Context, k8sClient client.Client)
 		"istio.io/*",
 		"pod-security.kubernetes.io/*",
 	})
-}
-
-func WaitForProtectionConfigUpdate(ctx context.Context, k8sClient client.Client, opts ProtectionConfigOptions) error {
-	time.Sleep(100 * time.Millisecond)
-	return nil
 }

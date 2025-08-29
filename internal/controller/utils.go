@@ -130,8 +130,8 @@ func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string
 	cr.Status.Conditions = append(cr.Status.Conditions, cond)
 }
 
-// ParseConfigMapPatterns parses patterns from ConfigMap data
-func ParseConfigMapPatterns(patternsData string) []string {
+// parseConfigMapPatterns parses patterns from ConfigMap data
+func parseConfigMapPatterns(patternsData string) []string {
 	if patternsData == "" {
 		return []string{}
 	}

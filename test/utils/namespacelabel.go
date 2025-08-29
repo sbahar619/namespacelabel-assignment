@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,15 +81,6 @@ func WaitForCRToExist(ctx context.Context, k8sClient client.Client, name, namesp
 			Namespace: namespace,
 		}, found)
 	}, time.Minute, time.Second).Should(Succeed())
-}
-
-// WaitForCRToBeDeleted waits for a CR to be deleted (IsNotFound)
-func WaitForCRToBeDeleted(ctx context.Context, k8sClient client.Client, name, namespace string) {
-	Eventually(func() bool {
-		found := &labelsv1alpha1.NamespaceLabel{}
-		err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, found)
-		return errors.IsNotFound(err)
-	}, time.Minute, time.Second).Should(BeTrue())
 }
 
 // GetCRStatus returns a function that gets the CR status
