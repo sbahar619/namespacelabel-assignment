@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -92,17 +94,30 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		return cr
 	}
 
-	createProtectionConfigMap := func() {
-		protectionCM := &corev1.ConfigMap{
+	createProtectionConfigMapObject := func(patterns []string, mode string) *corev1.ConfigMap {
+		data := map[string]string{
+			"mode": mode,
+		}
+		
+		if len(patterns) > 0 {
+			patternLines := make([]string, len(patterns))
+			for i, pattern := range patterns {
+				patternLines[i] = fmt.Sprintf("- \"%s\"", pattern)
+			}
+			data["patterns"] = strings.Join(patternLines, "\n")
+		}
+		
+		return &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ProtectionConfigMapName,
 				Namespace: ProtectionNamespace,
 			},
-			Data: map[string]string{
-				"patterns": "- \"kubernetes.io/*\"\n- \"*.k8s.io/*\"",
-				"mode":     "skip",
-			},
+			Data: data,
 		}
+	}
+
+	createProtectionConfigMap := func(patterns []string, mode string) {
+		protectionCM := createProtectionConfigMapObject(patterns, mode)
 		Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
 	}
 
@@ -123,7 +138,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 	Describe("Reconcile", func() {
 		It("should handle non-existent CR gracefully", func() {
-			createProtectionConfigMap()
+			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, "skip")
 			createNamespace("test-ns", nil, nil)
 
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
@@ -150,7 +165,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should apply labels to namespace successfully", func() {
-			createProtectionConfigMap()
+			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, "skip")
 			ns := createNamespace("test-ns", nil, nil)
 			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
 				Labels: map[string]string{
@@ -174,17 +189,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should create protection ConfigMap and apply protection by default", func() {
 			// Create protection ConfigMap with fail mode to test protection
-			protectionCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      ProtectionConfigMapName,
-					Namespace: ProtectionNamespace,
-				},
-				Data: map[string]string{
-					"patterns": "- \"kubernetes.io/*\"\n- \"*.k8s.io/*\"",
-					"mode":     "fail",
-				},
-			}
-			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, "fail")
 
 			ns := createNamespace("test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
@@ -212,17 +217,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should skip protected labels when ConfigMap exists with skip mode", func() {
 			// Create protection ConfigMap
-			protectionCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      ProtectionConfigMapName,
-					Namespace: ProtectionNamespace,
-				},
-				Data: map[string]string{
-					"patterns": "- \"kubernetes.io/*\"\n- \"*.k8s.io/*\"",
-					"mode":     "skip",
-				},
-			}
-			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, "skip")
 
 			ns := createNamespace("test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
@@ -248,17 +243,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should fail reconciliation when ConfigMap exists with fail mode", func() {
 			// Create protection ConfigMap with fail mode
-			protectionCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      ProtectionConfigMapName,
-					Namespace: ProtectionNamespace,
-				},
-				Data: map[string]string{
-					"patterns": "- \"kubernetes.io/*\"",
-					"mode":     "fail",
-				},
-			}
-			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
+			createProtectionConfigMap([]string{"kubernetes.io/*"}, "fail")
 
 			ns := createNamespace("test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
@@ -283,7 +268,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should handle label updates when spec changes", func() {
-			createProtectionConfigMap()
+			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, "skip")
 			ns := createNamespace("test-ns", map[string]string{
 				"old-label": "old-value",
 			}, map[string]string{
@@ -434,16 +419,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should parse ConfigMap with patterns and mode correctly", func() {
-			protectionCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      ProtectionConfigMapName,
-					Namespace: ProtectionNamespace,
-				},
-				Data: map[string]string{
-					"patterns": "- \"kubernetes.io/*\"\n- \"*.k8s.io/*\"\n- \"istio.io/*\"",
-					"mode":     "fail",
-				},
-			}
+			protectionCM := createProtectionConfigMapObject([]string{"kubernetes.io/*", "*.k8s.io/*", "istio.io/*"}, "fail")
 			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
 
 			config, err := reconciler.getProtectionConfig(ctx)
@@ -475,15 +451,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should handle ConfigMap with only mode specified", func() {
-			protectionCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      ProtectionConfigMapName,
-					Namespace: ProtectionNamespace,
-				},
-				Data: map[string]string{
-					"mode": "skip",
-				},
-			}
+			protectionCM := createProtectionConfigMapObject(nil, "skip")
 			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
 
 			config, err := reconciler.getProtectionConfig(ctx)
