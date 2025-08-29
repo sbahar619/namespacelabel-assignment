@@ -188,7 +188,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				cr := &labelsv1alpha1.NamespaceLabel{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: "labels", Namespace: testNS}, cr)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				cr.Spec.Labels = map[string]string{
 					"environment": "production",
 					"version":     "v2.0",
@@ -230,7 +230,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				By("Creating CR with conflicting protected label")
 				utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
 					Labels: map[string]string{
-						"app":               "test-app",
+						"app":                "test-app",
 						"system.io/critical": "false",
 					},
 				}, testNS)
@@ -291,8 +291,8 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				By("Creating a NamespaceLabel CR with mix of protected and unprotected labels")
 				utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
 					Labels: map[string]string{
-						"environment":             "production",
-						"team":                    "platform",
+						"environment":               "production",
+						"team":                      "platform",
 						"app.kubernetes.io/name":    "new-app",
 						"app.kubernetes.io/version": "v2.0.0",
 					},
