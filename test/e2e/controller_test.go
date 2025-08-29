@@ -129,7 +129,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		})
 	})
 
-	Context("No Protection Tests", Ordered, func() {
+	Context("Empty Protection Pattern Tests", Ordered, func() {
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 
