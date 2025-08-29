@@ -211,12 +211,10 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 
 	Context("Cross-Namespace Protection Scenarios", Serial, func() {
 		BeforeEach(func() {
-			// Ensure the protection namespace exists
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 		})
 
 		AfterEach(func() {
-			// Clean up protection ConfigMap after each test
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 

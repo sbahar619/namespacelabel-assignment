@@ -104,12 +104,11 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 	Context("Overlapping Kubernetes.io Pattern Tests", Ordered, func() {
 		BeforeAll(func() {
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
-				"kubernetes.io/*",          // Broader pattern
-				"*.kubernetes.io/*",        // More specific pattern
-				"security.kubernetes.io/*", // Most specific pattern
+				"kubernetes.io/*",
+				"*.kubernetes.io/*",
+				"security.kubernetes.io/*",
 			})).To(Succeed())
 		})
 
