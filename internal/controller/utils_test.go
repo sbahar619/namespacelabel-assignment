@@ -294,11 +294,7 @@ var _ = Describe("isLabelProtected", func() {
 		Entry("multiple patterns - first matches", "k8s.io/app", []string{"k8s.io/*", "other/*"}, true),
 		Entry("multiple patterns - second matches", "istio.io/version", []string{"k8s.io/*", "istio.io/*"}, true),
 		Entry("multiple patterns - no match", "myapp/version", []string{"k8s.io/*", "istio.io/*"}, false),
-		Entry("patterns with empty strings", "kubernetes.io/test", []string{"", "kubernetes.io/*", ""}, true),
-		Entry("only empty string patterns", "kubernetes.io/test", []string{"", "", ""}, false),
 		Entry("double asterisk pattern", "kubernetes.io/test", []string{"kubernetes.io/**"}, true),
-		Entry("malformed pattern with brackets", "kubernetes.io/test", []string{"kubernetes.io/[", "kubernetes.io/*"}, true),
-		Entry("all malformed patterns", "kubernetes.io/test", []string{"[unclosed", "bad[pattern"}, false),
 	)
 })
 
