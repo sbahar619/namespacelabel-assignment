@@ -172,6 +172,8 @@ func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, 
 }
 
 func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*ProtectionConfig, error) {
+	l := log.FromContext(ctx)
+
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{
 		Name:      ProtectionConfigMapName,
@@ -199,6 +201,16 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 
 	if mode, exists := cm.Data["mode"]; exists {
 		config.Mode = strings.TrimSpace(mode)
+
+		if config.Mode != "skip" && config.Mode != "fail" {
+			l.Info("Invalid protection mode detected, defaulting to 'skip'",
+				"configuredMode", config.Mode,
+				"validModes", []string{"skip", "fail"},
+				"defaultMode", "skip",
+				"configMap", ProtectionConfigMapName,
+				"namespace", ProtectionNamespace)
+			config.Mode = "skip"
+		}
 	}
 
 	return config, nil
