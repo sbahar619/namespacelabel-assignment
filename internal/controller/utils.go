@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -133,23 +134,11 @@ func parseConfigMapPatterns(patternsData string) []string {
 	}
 
 	var patterns []string
-	lines := strings.Split(patternsData, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "#") {
-			if commentIndex := strings.Index(line, "#"); commentIndex >= 0 {
-				line = line[:commentIndex]
-				line = strings.TrimSpace(line)
-			}
-			if strings.HasPrefix(line, "- ") {
-				line = strings.TrimPrefix(line, "- ")
-				line = strings.TrimSpace(line)
-			}
-			line = strings.Trim(line, "\"'")
-			if line != "" {
-				patterns = append(patterns, line)
-			}
-		}
+	err := yaml.Unmarshal([]byte(patternsData), &patterns)
+	if err != nil {
+		// If YAML parsing fails, return empty slice (defensive)
+		return []string{}
 	}
+
 	return patterns
 }
