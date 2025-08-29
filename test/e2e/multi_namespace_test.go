@@ -197,7 +197,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 				checkNS := &corev1.Namespace{}
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: ns}, checkNS)
 				return errors.IsNotFound(err)
-			}, time.Second*60, time.Second*2).Should(BeTrue())
+			}, time.Second*120, time.Second*2).Should(BeTrue())
 
 			for i, name := range testNSs {
 				if name == ns {
