@@ -19,6 +19,8 @@ spec:
     kind: NamespaceLabel
     listKind: NamespaceLabelList
     plural: namespacelabels
+    shortNames:
+    - nsl
     singular: namespacelabel
   scope: Namespaced
   versions:
@@ -54,27 +56,6 @@ spec:
                   Labels is a map of key-value pairs to apply to the namespace where this CR is created.
                   The target namespace is always the same as the CR's metadata.namespace for security.
                 type: object
-              protectedLabelPatterns:
-                description: |-
-                  ProtectedLabelPatterns is a list of glob patterns for label keys that should not be overwritten.
-                  If a label in the spec matches any of these patterns and the label already exists on the namespace
-                  with a different value, the behavior is controlled by protectionMode.
-                  Common patterns: "kubernetes.io/*", "*.k8s.io/*", "istio.io/*", "pod-security.kubernetes.io/*"
-                items:
-                  type: string
-                type: array
-              protectionMode:
-                default: skip
-                description: |-
-                  ProtectionMode controls behavior when attempting to modify protected labels.
-                  - skip: Silently skip protected labels (default)
-                  - warn: Skip protected labels but log warnings and update status
-                  - fail: Fail the entire reconciliation if any protected labels are attempted
-                enum:
-                - skip
-                - warn
-                - fail
-                type: string
             type: object
           status:
             description: NamespaceLabelStatus defines the observed state of NamespaceLabel
@@ -160,12 +141,6 @@ spec:
                 items:
                   type: string
                 type: array
-              protectedLabelsSkipped:
-                description: ProtectedLabelsSkipped lists label keys that were skipped
-                  due to protection
-                items:
-                  type: string
-                type: array
             type: object
         type: object
     served: true
@@ -237,6 +212,14 @@ kind: ClusterRole
 metadata:
   name: namespacelabel-manager-role
 rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -445,6 +428,19 @@ subjects:
   namespace: namespacelabel-system
 ---
 apiVersion: v1
+data:
+  mode: fail
+  patterns: |
+    - "kubernetes.io/*"
+    - "*.k8s.io/*"
+    - "istio.io/*"
+    - "pod-security.kubernetes.io/*"
+kind: ConfigMap
+metadata:
+  name: namespacelabel-namespacelabel-protection-config
+  namespace: namespacelabel-system
+---
+apiVersion: v1
 kind: Service
 metadata:
   labels:
@@ -531,7 +527,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: quay.io/sbahar/namespacelabel-controller:main
+        image: controller:latest
         livenessProbe:
           httpGet:
             path: /healthz
@@ -591,7 +587,7 @@ spec:
         - --metrics-bind-address=:8080
         command:
         - /webhook
-        image: quay.io/sbahar/namespacelabel-webhook:main
+        image: webhook:latest
         livenessProbe:
           httpGet:
             path: /healthz

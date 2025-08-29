@@ -20,13 +20,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -37,34 +36,31 @@ import (
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
 )
 
-// Run executes the provided command within this context
-func Run(cmd *exec.Cmd) ([]byte, error) {
-	dir, _ := GetProjectDir()
-	cmd.Dir = dir
+// GlobalTestClient is set by e2e test suite to provide access to the test environment client
+var GlobalTestClient client.Client
 
-	if err := os.Chdir(cmd.Dir); err != nil {
-		_, _ = fmt.Fprintf(GinkgoWriter, "chdir dir: %s\n", err)
+// CreateTestNamespace creates a test namespace with the given name and optional labels
+func CreateTestNamespace(
+	ctx context.Context, k8sClient client.Client, name string, labels map[string]string,
+) *corev1.Namespace {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
 	}
-
-	cmd.Env = append(os.Environ(), "GO111MODULE=on")
-	command := strings.Join(cmd.Args, " ")
-	_, _ = fmt.Fprintf(GinkgoWriter, "running: %s\n", command)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return output, fmt.Errorf("%s failed with error: (%v) %s", command, err, string(output))
-	}
-
-	return output, nil
+	Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+	return ns
 }
 
-// GetProjectDir will return the directory where the project is
-func GetProjectDir() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return wd, err
+// DeleteTestNamespace deletes a test namespace with the given name
+func DeleteTestNamespace(ctx context.Context, k8sClient client.Client, name string) {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
 	}
-	wd = strings.Replace(wd, "/test/e2e", "", -1)
-	return wd, nil
+	_ = k8sClient.Delete(ctx, ns) // Ignore errors since this is cleanup
 }
 
 // GetK8sClient returns a controller-runtime client configured for the current kubeconfig

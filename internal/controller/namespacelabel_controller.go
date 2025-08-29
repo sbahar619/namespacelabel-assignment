@@ -11,18 +11,18 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// RBAC: access our CRD + update Namespaces.
 // +kubebuilder:rbac:groups=labels.shahaf.com,resources=namespacelabels,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=labels.shahaf.com,resources=namespacelabels/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=labels.shahaf.com,resources=namespacelabels/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 
 func (r *NamespaceLabelReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Create the controller without unnecessary namespace watch
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&labelsv1alpha1.NamespaceLabel{}).
 		Complete(r)
@@ -38,23 +38,20 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// Handle deletion
 	if exists && current.DeletionTimestamp != nil {
 		return r.finalize(ctx, &current)
 	}
 
-	// Add finalizer if it doesn't exist and CR exists
 	if exists {
 		if !controllerutil.ContainsFinalizer(&current, FinalizerName) {
 			controllerutil.AddFinalizer(&current, FinalizerName)
 			if err := r.Update(ctx, &current); err != nil {
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, nil // Stop reconciliation after adding finalizer
+			return ctrl.Result{}, nil
 		}
 	}
 
-	// Target namespace is always the same as the CR's namespace for multi-tenant security
 	targetNS := req.Namespace
 
 	ns, err := r.getTargetNamespace(ctx, targetNS)
@@ -62,36 +59,29 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// Process namespace labels with protection logic
 	desired := current.Spec.Labels
 	prevApplied := readAppliedAnnotation(ns)
 
-	allProtectionPatterns := current.Spec.ProtectedLabelPatterns
-	protectionMode := current.Spec.ProtectionMode
-
-	// Apply protection logic
 	if ns.Labels == nil {
 		ns.Labels = map[string]string{}
 	}
 
-	protectionResult := applyProtectionLogic(
-		desired,
-		ns.Labels,
-		allProtectionPatterns,
-		protectionMode,
-	)
-
-	// If protection mode is "fail" and we hit protected labels, fail the reconciliation
-	if protectionResult.ShouldFail {
-		message := fmt.Sprintf("Protected label conflicts: %s", strings.Join(protectionResult.Warnings, "; "))
-		updateStatus(&current, false, "ProtectedLabelConflict", message, protectionResult.ProtectedSkipped, nil)
-		if err := r.Status().Update(ctx, &current); err != nil {
-			l.Error(err, "failed to update status for protection conflict")
-		}
-		return ctrl.Result{RequeueAfter: time.Minute * 5}, fmt.Errorf("protected label conflict: %s", strings.Join(protectionResult.Warnings, "; "))
+	protectionConfig, err := r.getProtectionConfig(ctx)
+	if err != nil {
+		l.Error(err, "failed to read protection config")
+		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
-	changed := r.applyLabelsToNamespace(ns, protectionResult.AllowedLabels, prevApplied)
+	allowedLabels, skippedLabels, err := r.filterProtectedLabels(desired, ns.Labels, protectionConfig)
+	if err != nil {
+		updateStatus(&current, false, "ProtectionError", err.Error(), nil)
+		if statusErr := r.Status().Update(ctx, &current); statusErr != nil {
+			l.Error(statusErr, "failed to update status for protection error")
+		}
+		return ctrl.Result{RequeueAfter: time.Minute * 5}, err
+	}
+
+	changed := r.applyLabelsToNamespace(ns, allowedLabels, prevApplied)
 
 	if changed {
 		if err := r.Update(ctx, ns); err != nil {
@@ -99,34 +89,32 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	if err := writeAppliedAnnotation(ctx, r.Client, ns, protectionResult.AllowedLabels); err != nil {
-		// Log error but don't fail reconciliation since labels were applied successfully
+	if err := writeAppliedAnnotation(ctx, r.Client, ns, allowedLabels); err != nil {
 		l.Error(err, "failed to write applied annotation")
 	}
 
 	if exists {
 		labelCount := len(desired)
-		appliedCount := len(protectionResult.AllowedLabels)
-		skippedCount := len(protectionResult.ProtectedSkipped)
+		appliedCount := len(allowedLabels)
+		skippedCount := len(skippedLabels)
 
 		var message string
 		if skippedCount > 0 {
-			message = fmt.Sprintf("Applied %d labels to namespace '%s', skipped %d protected labels (%v)",
-				appliedCount, targetNS, skippedCount, protectionResult.ProtectedSkipped)
+			message = fmt.Sprintf("Applied %d of %d labels to namespace '%s', skipped %d protected labels (%v)",
+				appliedCount, labelCount, targetNS, skippedCount, skippedLabels)
 		} else {
-			message = fmt.Sprintf("Applied %d labels to namespace '%s'",
-				appliedCount, targetNS)
+			message = fmt.Sprintf("Applied %d labels to namespace '%s'", appliedCount, targetNS)
 		}
 
-		appliedKeys := make([]string, 0, len(protectionResult.AllowedLabels))
-		for k := range protectionResult.AllowedLabels {
+		appliedKeys := make([]string, 0, len(allowedLabels))
+		for k := range allowedLabels {
 			appliedKeys = append(appliedKeys, k)
 		}
 
 		l.Info("NamespaceLabel successfully processed",
 			"namespace", current.Namespace, "labelsApplied", appliedCount, "labelsRequested", labelCount, "protectedSkipped", skippedCount)
 
-		updateStatus(&current, true, "Synced", message, protectionResult.ProtectedSkipped, appliedKeys)
+		updateStatus(&current, true, "Synced", message, appliedKeys)
 		if err := r.Status().Update(ctx, &current); err != nil {
 			l.Error(err, "failed to update CR status")
 		}
@@ -135,14 +123,12 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{}, nil
 }
 
-// finalize cleans up namespace labels and removes the finalizer
 func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alpha1.NamespaceLabel) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
 
 	ns, err := r.getTargetNamespace(ctx, cr.Namespace)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			// Namespace is gone - just remove finalizer
 			controllerutil.RemoveFinalizer(cr, FinalizerName)
 			return ctrl.Result{}, r.Update(ctx, cr)
 		}
@@ -167,12 +153,7 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 	return ctrl.Result{}, r.Update(ctx, cr)
 }
 
-// getTargetNamespace retrieves the namespace that should be modified
 func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targetNS string) (*corev1.Namespace, error) {
-	if targetNS == "" {
-		return nil, fmt.Errorf("empty namespace name")
-	}
-
 	var ns corev1.Namespace
 	if err := r.Get(ctx, types.NamespacedName{Name: targetNS}, &ns); err != nil {
 		return nil, err
@@ -180,7 +161,6 @@ func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targe
 	return &ns, nil
 }
 
-// applyLabelsToNamespace applies desired labels and removes stale ones
 func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, desired, prevApplied map[string]string) bool {
 	if ns.Labels == nil {
 		ns.Labels = make(map[string]string)
@@ -189,4 +169,79 @@ func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, 
 	changed := removeStaleLabels(ns.Labels, desired, prevApplied)
 	changed = applyDesiredLabels(ns.Labels, desired) || changed
 	return changed
+}
+
+func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*ProtectionConfig, error) {
+	l := log.FromContext(ctx)
+
+	cm := &corev1.ConfigMap{}
+	err := r.Get(ctx, client.ObjectKey{
+		Name:      ProtectionConfigMapName,
+		Namespace: ProtectionNamespace,
+	}, cm)
+
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return &ProtectionConfig{
+				Patterns: []string{},
+				Mode:     ProtectionModeSkip,
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to read protection ConfigMap '%s/%s': %w", ProtectionNamespace, ProtectionConfigMapName, err)
+	}
+
+	config := &ProtectionConfig{
+		Patterns: []string{},
+		Mode:     ProtectionModeSkip,
+	}
+
+	if patternsData, exists := cm.Data["patterns"]; exists {
+		config.Patterns = parseConfigMapPatterns(patternsData)
+	}
+
+	if mode, exists := cm.Data["mode"]; exists {
+		config.Mode = strings.TrimSpace(mode)
+
+		if config.Mode != ProtectionModeSkip && config.Mode != ProtectionModeFail {
+			l.Info("Invalid protection mode detected, defaulting to 'skip'",
+				"configuredMode", config.Mode,
+				"validModes", []string{ProtectionModeSkip, ProtectionModeFail},
+				"defaultMode", ProtectionModeSkip,
+				"configMap", ProtectionConfigMapName,
+				"namespace", ProtectionNamespace)
+			config.Mode = ProtectionModeSkip
+		}
+	}
+
+	return config, nil
+}
+
+func (r *NamespaceLabelReconciler) filterProtectedLabels(
+	desired map[string]string,
+	existing map[string]string,
+	config *ProtectionConfig,
+) (allowed map[string]string, skipped []string, err error) {
+	allowed = make(map[string]string)
+	skipped = []string{}
+
+	for key, value := range desired {
+		if isLabelProtected(key, config.Patterns) {
+			existingValue, hasExisting := existing[key]
+
+			if hasExisting && existingValue != value {
+				switch config.Mode {
+				case ProtectionModeFail:
+					return nil, nil, fmt.Errorf("protected label '%s' cannot be modified (existing: '%s', attempted: '%s')",
+						key, existingValue, value)
+				default:
+					skipped = append(skipped, key)
+					continue
+				}
+			}
+		}
+
+		allowed[key] = value
+	}
+
+	return allowed, skipped, nil
 }

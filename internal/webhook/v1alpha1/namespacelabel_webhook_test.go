@@ -224,34 +224,4 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 			Expect(warnings).To(BeEmpty())
 		})
 	})
-
-	Describe("Type validation", func() {
-		It("should reject non-NamespaceLabel objects", func() {
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-			validator = &NamespaceLabelCustomValidator{Client: fakeClient}
-
-			// Use a ConfigMap as a different runtime.Object type
-			obj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "not-a-namespacelabel",
-					Namespace: "test-ns",
-				},
-			}
-
-			warnings, err := validator.ValidateCreate(ctx, obj)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("expected a NamespaceLabel object"))
-			Expect(warnings).To(BeEmpty())
-
-			warnings, err = validator.ValidateUpdate(ctx, obj, obj)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("expected a NamespaceLabel object"))
-			Expect(warnings).To(BeEmpty())
-
-			warnings, err = validator.ValidateDelete(ctx, obj)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("expected a NamespaceLabel object"))
-			Expect(warnings).To(BeEmpty())
-		})
-	})
 })

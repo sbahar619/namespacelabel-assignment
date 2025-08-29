@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,7 +29,6 @@ func readAppliedAnnotation(ns *corev1.Namespace) map[string]string {
 }
 
 func writeAppliedAnnotation(ctx context.Context, c client.Client, ns *corev1.Namespace, applied map[string]string) error {
-	// Fetch a fresh copy of the namespace to avoid conflicts with the previously updated object
 	var freshNS corev1.Namespace
 	if err := c.Get(ctx, types.NamespacedName{Name: ns.Name}, &freshNS); err != nil {
 		return fmt.Errorf("failed to fetch namespace for annotation update: %w", err)
@@ -43,9 +43,8 @@ func writeAppliedAnnotation(ctx context.Context, c client.Client, ns *corev1.Nam
 		return fmt.Errorf("marshal applied: %w", err)
 	}
 
-	// Check if annotation already has the correct value
 	if cur, ok := freshNS.Annotations[appliedAnnoKey]; ok && cur == string(b) {
-		return nil // no change needed
+		return nil
 	}
 
 	freshNS.Annotations[appliedAnnoKey] = string(b)
@@ -59,7 +58,27 @@ func boolToCond(b bool) metav1.ConditionStatus {
 	return metav1.ConditionFalse
 }
 
-// removeStaleLabels removes labels that were previously applied by this operator but are no longer desired
+func isLabelProtected(labelKey string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if pattern == "" {
+			continue
+		}
+
+		if strings.Contains(pattern, "**") {
+			pattern = strings.ReplaceAll(pattern, "**", "*")
+		}
+
+		matched, err := filepath.Match(pattern, labelKey)
+		if err != nil {
+			continue
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
 func removeStaleLabels(current, desired, prevApplied map[string]string) bool {
 	changed := false
 	for key, prevVal := range prevApplied {
@@ -73,7 +92,6 @@ func removeStaleLabels(current, desired, prevApplied map[string]string) bool {
 	return changed
 }
 
-// applyDesiredLabels sets or updates labels to their desired values
 func applyDesiredLabels(current, desired map[string]string) bool {
 	changed := false
 	for key, val := range desired {
@@ -85,91 +103,10 @@ func applyDesiredLabels(current, desired map[string]string) bool {
 	return changed
 }
 
-// isLabelProtected checks if a label key matches any of the protection patterns
-func isLabelProtected(labelKey string, protectionPatterns []string) bool {
-	for _, pattern := range protectionPatterns {
-		// Skip empty patterns
-		if pattern == "" {
-			continue
-		}
-
-		// Handle problematic patterns that might cause issues
-		// Patterns like "**/*" are not valid filepath patterns
-		if strings.Contains(pattern, "**") {
-			// Convert double wildcards to single wildcards for this context
-			pattern = strings.ReplaceAll(pattern, "**", "*")
-		}
-
-		// Use filepath.Match for glob pattern matching
-		matched, err := filepath.Match(pattern, labelKey)
-		if err != nil {
-			// If there's an error in pattern matching, log it but continue
-			// This prevents malformed patterns from breaking protection
-			continue
-		}
-		if matched {
-			return true
-		}
-	}
-	return false
-}
-
-// applyProtectionLogic processes desired labels against protection rules
-func applyProtectionLogic(
-	desired map[string]string,
-	existing map[string]string,
-	protectionPatterns []string,
-	protectionMode labelsv1alpha1.ProtectionMode,
-) ProtectionResult {
-	result := ProtectionResult{
-		AllowedLabels:    make(map[string]string),
-		ProtectedSkipped: []string{},
-		Warnings:         []string{},
-		ShouldFail:       false,
-	}
-
-	for key, value := range desired {
-		// Check if this label is protected
-		if isLabelProtected(key, protectionPatterns) {
-			existingValue, hasExisting := existing[key]
-
-			// If the label exists with a different value, apply protection
-			if hasExisting && existingValue != value {
-				msg := fmt.Sprintf("Label '%s' is protected by pattern and has existing value '%s' (attempting to set '%s')",
-					key, existingValue, value)
-
-				switch protectionMode {
-				case labelsv1alpha1.ProtectionModeFail:
-					result.ShouldFail = true
-					result.Warnings = append(result.Warnings, msg)
-					return result
-				case labelsv1alpha1.ProtectionModeWarn:
-					result.Warnings = append(result.Warnings, msg)
-					result.ProtectedSkipped = append(result.ProtectedSkipped, key)
-					continue
-				default: // ProtectionModeSkip
-					result.ProtectedSkipped = append(result.ProtectedSkipped, key)
-					continue
-				}
-			}
-
-			// Protected label with no conflict - allow it
-			// Either setting a new protected label (!hasExisting) or no change needed (existingValue == value)
-		}
-
-		// Label is either not protected or safe to apply
-		result.AllowedLabels[key] = value
-	}
-
-	return result
-}
-
-func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string, protectedSkipped, labelsApplied []string) {
+func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string, labelsApplied []string) {
 	cr.Status.Applied = ok
-	cr.Status.ProtectedLabelsSkipped = protectedSkipped
 	cr.Status.LabelsApplied = labelsApplied
 
-	// Update condition
 	cond := metav1.Condition{
 		Type:               "Ready",
 		Status:             metav1.ConditionTrue,
@@ -182,7 +119,6 @@ func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string
 		cond.Status = metav1.ConditionFalse
 	}
 
-	// Replace existing Ready condition or add new one
 	for i := range cr.Status.Conditions {
 		if cr.Status.Conditions[i].Type == "Ready" {
 			cr.Status.Conditions[i] = cond
@@ -190,4 +126,19 @@ func updateStatus(cr *labelsv1alpha1.NamespaceLabel, ok bool, reason, msg string
 		}
 	}
 	cr.Status.Conditions = append(cr.Status.Conditions, cond)
+}
+
+func parseConfigMapPatterns(patternsData string) []string {
+	if patternsData == "" {
+		return []string{}
+	}
+
+	var patterns []string
+	err := yaml.Unmarshal([]byte(patternsData), &patterns)
+	if err != nil {
+		// If YAML parsing fails, return empty slice (defensive)
+		return []string{}
+	}
+
+	return patterns
 }

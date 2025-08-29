@@ -21,6 +21,8 @@ resources:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
 # crd/kustomization.yaml
 - ../webhook
+# [PROTECTION] Admin protection configuration
+- ../protection
 # [CERTMANAGER] To enable cert-manager, create config/certmanager directory and uncomment all sections with 'CERTMANAGER'. 'WEBHOOK' components are required.
 #- ../certmanager
 # [PROMETHEUS] To enable prometheus monitor, uncomment all sections with 'PROMETHEUS'.
