@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: namespacelabel
     app.kubernetes.io/managed-by: kustomize
-  name: namespacelabel-webhook-service
+  name: webhook-service
   namespace: system
 spec:
   ports:

@@ -8,7 +8,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: namespacelabel-webhook-service
+      name: webhook-service
       namespace: system
       path: /validate-labels-shahaf-com-v1alpha1-namespacelabel
   failurePolicy: Fail
