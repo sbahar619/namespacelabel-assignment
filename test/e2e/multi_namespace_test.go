@@ -212,7 +212,6 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 				return errors.IsNotFound(err)
 			}, time.Second*60, time.Second*2).Should(BeTrue())
 
-			// Remove from cleanup list since we manually deleted it
 			for i, name := range testNSs {
 				if name == ns {
 					testNSs = append(testNSs[:i], testNSs[i+1:]...)

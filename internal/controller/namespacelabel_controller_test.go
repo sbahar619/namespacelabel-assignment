@@ -37,7 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Tests for functions in namespacelabel_controller.go
+
 
 var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	var (
@@ -67,7 +67,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		Expect(fakeClient.Create(ctx, protectionNS)).To(Succeed())
 	})
 
-	// Helper functions to reduce code duplication
+
 	createNamespace := func(name string, labels map[string]string, annotations map[string]string) *corev1.Namespace {
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -148,23 +148,26 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should add finalizer to CR without finalizer", func() {
+			By("Setting up namespace and NamespaceLabel resource without finalizer")
 			createNamespace("test-ns", nil, nil)
 			cr := createCR("labels", "test-ns", nil, nil, labelsv1alpha1.NamespaceLabelSpec{
 				Labels: map[string]string{"app": "test"},
 			})
 
+			By("Reconciling the NamespaceLabel resource")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(reconcile.Result{}))
 
-			// Verify finalizer was added
+			By("Verifying finalizer was added to the NamespaceLabel")
 			var updatedCR labelsv1alpha1.NamespaceLabel
 			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(cr), &updatedCR)).To(Succeed())
 			Expect(updatedCR.Finalizers).To(ContainElement(FinalizerName))
 		})
 
 		It("should apply labels to namespace successfully", func() {
+			By("Setting up protection ConfigMap and test namespace")
 			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, "skip")
 			ns := createNamespace("test-ns", nil, nil)
 			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
@@ -174,51 +177,53 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				},
 			})
 
+			By("Reconciling the NamespaceLabel resource")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(reconcile.Result{}))
 
-			// Verify labels were applied to namespace
-			var updatedNS corev1.Namespace
-			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &updatedNS)).To(Succeed())
-			Expect(updatedNS.Labels).To(HaveKeyWithValue("app", "test"))
-			Expect(updatedNS.Labels).To(HaveKeyWithValue("env", "prod"))
-			Expect(updatedNS.Annotations).To(HaveKey(appliedAnnoKey))
+			By("Verifying labels were applied to the namespace")
+			var namespaceAfterReconciliation corev1.Namespace
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &namespaceAfterReconciliation)).To(Succeed())
+			Expect(namespaceAfterReconciliation.Labels).To(HaveKeyWithValue("app", "test"))
+			Expect(namespaceAfterReconciliation.Labels).To(HaveKeyWithValue("env", "prod"))
+			Expect(namespaceAfterReconciliation.Annotations).To(HaveKey(appliedAnnoKey))
 		})
 
 		It("should create protection ConfigMap and apply protection by default", func() {
-			// Create protection ConfigMap with fail mode to test protection
+			By("Creating protection ConfigMap with fail mode")
 			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, "fail")
 
+			By("Setting up namespace with existing protected label")
 			ns := createNamespace("test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
 			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
 				Labels: map[string]string{
 					"app":                      "test",
-					"kubernetes.io/managed-by": "my-operator", // Should be blocked by default protection
+					"kubernetes.io/managed-by": "my-operator", // Should be blocked by protection
 				},
 			})
 
+			By("Reconciling and expecting failure due to protected label conflict")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
 
-			Expect(err).To(HaveOccurred()) // Should fail due to default protection
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("protected label 'kubernetes.io/managed-by' cannot be modified"))
 			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 
-			// ConfigMap already exists and should have applied protection
-
-			// Verify protected label was not changed
-			var updatedNS corev1.Namespace
-			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &updatedNS)).To(Succeed())
-			Expect(updatedNS.Labels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
+			By("Verifying protected label was not changed")
+			var namespaceAfterFailedReconciliation corev1.Namespace
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &namespaceAfterFailedReconciliation)).To(Succeed())
+			Expect(namespaceAfterFailedReconciliation.Labels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
 		})
 
 		It("should skip protected labels when ConfigMap exists with skip mode", func() {
-			// Create protection ConfigMap
+			By("Creating protection ConfigMap with skip mode")
 			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, "skip")
 
+			By("Setting up namespace with existing protected label")
 			ns := createNamespace("test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
@@ -229,22 +234,24 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				},
 			})
 
+			By("Reconciling the NamespaceLabel resource")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
 
-			// Verify app label applied, protected label skipped
-			var updatedNS corev1.Namespace
-			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &updatedNS)).To(Succeed())
-			Expect(updatedNS.Labels).To(HaveKeyWithValue("app", "test"))
-			Expect(updatedNS.Labels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
+			By("Verifying app label was applied while protected label was skipped")
+			var namespaceAfterReconciliation corev1.Namespace
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &namespaceAfterReconciliation)).To(Succeed())
+			Expect(namespaceAfterReconciliation.Labels).To(HaveKeyWithValue("app", "test"))
+			Expect(namespaceAfterReconciliation.Labels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
 		})
 
 		It("should fail reconciliation when ConfigMap exists with fail mode", func() {
-			// Create protection ConfigMap with fail mode
+			By("Creating protection ConfigMap with fail mode")
 			createProtectionConfigMap([]string{"kubernetes.io/*"}, "fail")
 
+			By("Setting up namespace with existing protected label")
 			ns := createNamespace("test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
@@ -255,16 +262,17 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				},
 			})
 
+			By("Reconciling and expecting failure due to protected label conflict")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("protected label 'kubernetes.io/managed-by' cannot be modified"))
 			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 
-			// Verify protected label was not changed
-			var updatedNS corev1.Namespace
-			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &updatedNS)).To(Succeed())
-			Expect(updatedNS.Labels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
+			By("Verifying protected label was not changed")
+			var namespaceAfterFailedReconciliation corev1.Namespace
+			Expect(fakeClient.Get(ctx, client.ObjectKeyFromObject(ns), &namespaceAfterFailedReconciliation)).To(Succeed())
+			Expect(namespaceAfterFailedReconciliation.Labels).To(HaveKeyWithValue("kubernetes.io/managed-by", "existing-operator"))
 		})
 
 		It("should handle label updates when spec changes", func() {

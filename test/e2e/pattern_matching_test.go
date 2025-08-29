@@ -75,8 +75,8 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 
 	Context("Nested Wildcard Pattern Tests", Ordered, func() {
 		BeforeAll(func() {
+			By("Setting up protection namespace and nested wildcard patterns")
 			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			// Set up nested wildcard patterns once for this group
 			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
 			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"*.*.k8s.io/*",

@@ -64,11 +64,9 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 	AfterEach(func() {
 		By("Cleaning up test namespace")
 
-		// First, delete any NamespaceLabel CRs in the namespace to remove finalizers
 		By("Cleaning up NamespaceLabel CRs to remove finalizers")
 		utils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
 
-		// Now delete the namespace
 		By("Deleting the test namespace")
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -77,12 +75,10 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		}
 		err := k8sClient.Delete(ctx, ns)
 		if err != nil && !apierrors.IsNotFound(err) {
-			// Log but don't fail the test - this is cleanup
 			fmt.Printf("Warning: failed to delete namespace %s: %v\n", testNS, err)
 			return // Skip waiting if delete failed
 		}
 
-		// Wait for namespace to be fully deleted
 		By("Waiting for namespace to be fully deleted")
 		Eventually(func() bool {
 			checkNS := &corev1.Namespace{}

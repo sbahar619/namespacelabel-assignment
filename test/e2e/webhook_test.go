@@ -63,7 +63,6 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func(
 	AfterEach(func() {
 		By("Cleaning up test namespace")
 
-		// First, delete any NamespaceLabel CRs in the namespace to remove finalizers
 		By("Cleaning up NamespaceLabel CRs to remove finalizers")
 		utils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
 
