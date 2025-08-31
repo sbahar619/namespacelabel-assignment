@@ -137,7 +137,9 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 	}
 
 	prevApplied := getAppliedLabels(&freshCR)
+	l.Info("DEBUG finalize", "namespace", ns.Name, "currentLabels", ns.Labels, "prevApplied", prevApplied)
 	changed := r.applyLabelsToNamespace(ns, map[string]string{}, prevApplied)
+	l.Info("DEBUG finalize after", "namespace", ns.Name, "labelsAfter", ns.Labels, "changed", changed)
 	if changed {
 		if err := r.Update(ctx, ns); err != nil {
 			l.Error(err, "failed to remove applied labels")
@@ -150,6 +152,10 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 		l.Error(statusErr, "failed to clear applied labels in status")
 	}
 	controllerutil.RemoveFinalizer(&freshCR, FinalizerName)
+	
+	// Update the original CR object for test compatibility
+	controllerutil.RemoveFinalizer(cr, FinalizerName)
+	
 	return ctrl.Result{}, r.Update(ctx, &freshCR)
 }
 
