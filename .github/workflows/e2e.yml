@@ -4,21 +4,7 @@ on:
   workflow_run:
     workflows: ["Test"]
     types: [completed]
-    branches: [main, develop]  # Only run E2E for main/develop branches
-  push:
-    branches: [main, develop]  # Direct pushes to main/develop (no PR)
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
-  pull_request:  # Run E2E tests on PRs
-    types: [opened, synchronize, reopened]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
+    branches: [main, develop, remove-ns-annotations, namespacelabel-operator]  # Only run E2E after Test completes on these branches
   workflow_dispatch:  # Allow manual triggering
   schedule:
     - cron: '0 2 * * *'  # Nightly at 2 AM
