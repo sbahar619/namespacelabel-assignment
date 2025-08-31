@@ -60,7 +60,7 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	desired := current.Spec.Labels
-	prevApplied := readAppliedAnnotation(ns)
+	prevApplied := getAppliedLabels(&current)
 
 	if ns.Labels == nil {
 		ns.Labels = map[string]string{}
@@ -74,7 +74,7 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	allowedLabels, skippedLabels, err := r.filterProtectedLabels(desired, ns.Labels, protectionConfig)
 	if err != nil {
-		updateStatus(&current, false, "ProtectionError", err.Error(), nil)
+		updateStatus(&current, false, "ProtectionError", err.Error())
 		if statusErr := r.Status().Update(ctx, &current); statusErr != nil {
 			l.Error(statusErr, "failed to update status for protection error")
 		}
@@ -87,10 +87,6 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err := r.Update(ctx, ns); err != nil {
 			return ctrl.Result{}, err
 		}
-	}
-
-	if err := writeAppliedAnnotation(ctx, r.Client, ns, allowedLabels); err != nil {
-		l.Error(err, "failed to write applied annotation")
 	}
 
 	if exists {
@@ -106,15 +102,11 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			message = fmt.Sprintf("Applied %d labels to namespace '%s'", appliedCount, targetNS)
 		}
 
-		appliedKeys := make([]string, 0, len(allowedLabels))
-		for k := range allowedLabels {
-			appliedKeys = append(appliedKeys, k)
-		}
-
 		l.Info("NamespaceLabel successfully processed",
 			"namespace", current.Namespace, "labelsApplied", appliedCount, "labelsRequested", labelCount, "protectedSkipped", skippedCount)
 
-		updateStatus(&current, true, "Synced", message, appliedKeys)
+		current.Status.AppliedLabels = allowedLabels
+		updateStatus(&current, true, "Synced", message)
 		if err := r.Status().Update(ctx, &current); err != nil {
 			l.Error(err, "failed to update CR status")
 		}
@@ -129,13 +121,17 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 	ns, err := r.getTargetNamespace(ctx, cr.Namespace)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
+			cr.Status.AppliedLabels = map[string]string{}
+			if statusErr := r.Status().Update(ctx, cr); statusErr != nil {
+				l.Error(statusErr, "failed to clear applied labels in status")
+			}
 			controllerutil.RemoveFinalizer(cr, FinalizerName)
 			return ctrl.Result{}, r.Update(ctx, cr)
 		}
 		return ctrl.Result{}, err
 	}
 
-	prevApplied := readAppliedAnnotation(ns)
+	prevApplied := getAppliedLabels(cr)
 	changed := r.applyLabelsToNamespace(ns, map[string]string{}, prevApplied)
 	if changed {
 		if err := r.Update(ctx, ns); err != nil {
@@ -144,11 +140,10 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 		}
 	}
 
-	if err := writeAppliedAnnotation(ctx, r.Client, ns, map[string]string{}); err != nil {
-		l.Error(err, "failed to clear applied annotation")
-		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	cr.Status.AppliedLabels = map[string]string{}
+	if statusErr := r.Status().Update(ctx, cr); statusErr != nil {
+		l.Error(statusErr, "failed to clear applied labels in status")
 	}
-
 	controllerutil.RemoveFinalizer(cr, FinalizerName)
 	return ctrl.Result{}, r.Update(ctx, cr)
 }

@@ -17,16 +17,10 @@ limitations under the License.
 package controller
 
 import (
-	"context"
-	"encoding/json"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -42,125 +36,26 @@ func createTestNamespace(name string, annotations map[string]string) *corev1.Nam
 	return ns
 }
 
-var _ = Describe("readAppliedAnnotation", Label("controller"), func() {
-	DescribeTable("annotation parsing scenarios",
-		func(annotations map[string]string, expectedResult map[string]string) {
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: annotations,
+var _ = Describe("getAppliedLabels", Label("controller"), func() {
+	DescribeTable("status parsing scenarios",
+		func(appliedLabels map[string]string, expectedResult map[string]string) {
+			cr := &labelsv1alpha1.NamespaceLabel{
+				Status: labelsv1alpha1.NamespaceLabelStatus{
+					AppliedLabels: appliedLabels,
 				},
 			}
-			result := readAppliedAnnotation(ns)
+			result := getAppliedLabels(cr)
 			Expect(result).To(Equal(expectedResult))
 		},
-		Entry("valid JSON annotation",
-			map[string]string{"labels.shahaf.com/applied": `{"app":"web","environment":"prod"}`},
+		Entry("valid applied labels",
+			map[string]string{"app": "web", "environment": "prod"},
 			map[string]string{"app": "web", "environment": "prod"}),
-		Entry("empty annotation",
-			map[string]string{"labels.shahaf.com/applied": ""},
-			map[string]string{}),
-		Entry("missing annotation",
+		Entry("empty applied labels",
 			map[string]string{},
 			map[string]string{}),
-		Entry("invalid JSON",
-			map[string]string{"labels.shahaf.com/applied": `{invalid-json}`},
+		Entry("nil applied labels",
+			nil,
 			map[string]string{}),
-	)
-
-	It("should handle nil annotations gracefully", func() {
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: nil,
-			},
-		}
-		result := readAppliedAnnotation(ns)
-		Expect(result).To(BeEmpty())
-	})
-})
-
-var _ = Describe("writeAppliedAnnotation", func() {
-	It("should write annotation correctly", func() {
-		scheme := runtime.NewScheme()
-		Expect(corev1.AddToScheme(scheme)).To(Succeed())
-
-		ns := createTestNamespace("test-ns", make(map[string]string))
-
-		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns).Build()
-
-		appliedLabels := map[string]string{
-			"app": "web",
-			"env": "prod",
-		}
-
-		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
-		Expect(err).NotTo(HaveOccurred())
-
-		var updatedNS corev1.Namespace
-		err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(ns), &updatedNS)
-		Expect(err).NotTo(HaveOccurred())
-
-		result := readAppliedAnnotation(&updatedNS)
-		Expect(result).To(Equal(appliedLabels))
-	})
-
-	It("should handle namespace fetch error", func() {
-		scheme := runtime.NewScheme()
-		Expect(corev1.AddToScheme(scheme)).To(Succeed())
-
-		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-
-		ns := createTestNamespace("nonexistent-ns", nil)
-
-		appliedLabels := map[string]string{"app": "test"}
-		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("failed to fetch namespace"))
-	})
-
-	It("should skip update when annotation value is already correct", func() {
-		scheme := runtime.NewScheme()
-		Expect(corev1.AddToScheme(scheme)).To(Succeed())
-
-		appliedLabels := map[string]string{"app": "test"}
-		expectedJSON, _ := json.Marshal(appliedLabels)
-
-		ns := createTestNamespace("test-ns", map[string]string{
-			appliedAnnoKey: string(expectedJSON),
-		})
-
-		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns).Build()
-
-		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("should create annotations map when nil", func() {
-		scheme := runtime.NewScheme()
-		Expect(corev1.AddToScheme(scheme)).To(Succeed())
-
-		ns := createTestNamespace("test-ns", nil)
-
-		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns).Build()
-
-		appliedLabels := map[string]string{"app": "test"}
-		err := writeAppliedAnnotation(context.TODO(), fakeClient, ns, appliedLabels)
-		Expect(err).NotTo(HaveOccurred())
-
-		var updatedNS corev1.Namespace
-		err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(ns), &updatedNS)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(updatedNS.Annotations).NotTo(BeNil())
-		Expect(updatedNS.Annotations).To(HaveKey(appliedAnnoKey))
-	})
-})
-
-var _ = Describe("boolToCond", func() {
-	DescribeTable("boolean to condition conversion",
-		func(input bool, expected metav1.ConditionStatus) {
-			Expect(boolToCond(input)).To(Equal(expected))
-		},
-		Entry("true to ConditionTrue", true, metav1.ConditionTrue),
-		Entry("false to ConditionFalse", false, metav1.ConditionFalse),
 	)
 })
 
@@ -298,7 +193,7 @@ var _ = Describe("updateStatus", func() {
 			Status: labelsv1alpha1.NamespaceLabelStatus{},
 		}
 
-		updateStatus(cr, true, "Synced", "Labels applied successfully", nil)
+		updateStatus(cr, true, "Synced", "Labels applied successfully")
 
 		Expect(cr.Status.Applied).To(BeTrue())
 		Expect(cr.Status.Conditions).To(HaveLen(1))
@@ -315,7 +210,7 @@ var _ = Describe("updateStatus", func() {
 			Status: labelsv1alpha1.NamespaceLabelStatus{},
 		}
 
-		updateStatus(cr, false, "InvalidName", "CR must be named 'labels'", nil)
+		updateStatus(cr, false, "InvalidName", "CR must be named 'labels'")
 
 		Expect(cr.Status.Applied).To(BeFalse())
 		Expect(cr.Status.Conditions).To(HaveLen(1))

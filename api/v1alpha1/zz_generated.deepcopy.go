@@ -116,10 +116,12 @@ func (in *NamespaceLabelStatus) DeepCopyInto(out *NamespaceLabelStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.LabelsApplied != nil {
-		in, out := &in.LabelsApplied, &out.LabelsApplied
-		*out = make([]string, len(*in))
-		copy(*out, *in)
+	if in.AppliedLabels != nil {
+		in, out := &in.AppliedLabels, &out.AppliedLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 }
 

@@ -56,6 +56,12 @@ spec:
                 description: Applied indicates whether the labels were successfully
                   applied
                 type: boolean
+              appliedLabels:
+                additionalProperties:
+                  type: string
+                description: AppliedLabels tracks the key-value pairs that were successfully
+                  applied
+                type: object
               conditions:
                 description: Conditions represent the latest available observations
                   of the resource's state
@@ -126,12 +132,6 @@ spec:
                   - status
                   - type
                   type: object
-                type: array
-              labelsApplied:
-                description: LabelsApplied lists the label keys that were successfully
-                  applied
-                items:
-                  type: string
                 type: array
             type: object
         type: object

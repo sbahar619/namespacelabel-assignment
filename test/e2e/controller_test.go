@@ -306,7 +306,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 					}
 
 					expectedApplied := 2
-					actualApplied := len(status.LabelsApplied)
+					actualApplied := len(status.AppliedLabels)
 
 					return status.Applied == true && actualApplied == expectedApplied
 				}, time.Minute, time.Second).Should(BeTrue())

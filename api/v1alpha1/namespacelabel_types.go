@@ -35,9 +35,9 @@ type NamespaceLabelStatus struct {
 	// Conditions represent the latest available observations of the resource's state
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// LabelsApplied lists the label keys that were successfully applied
+	// AppliedLabels tracks the key-value pairs that were successfully applied
 	// +optional
-	LabelsApplied []string `json:"labelsApplied,omitempty"`
+	AppliedLabels map[string]string `json:"appliedLabels,omitempty"`
 }
 
 //+kubebuilder:object:root=true

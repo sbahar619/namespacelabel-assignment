@@ -6,7 +6,6 @@ import (
 )
 
 const (
-	appliedAnnoKey          = "labels.shahaf.com/applied"
 	FinalizerName           = "labels.shahaf.com/finalizer"
 	StandardCRName          = "labels" // Standard name for NamespaceLabel CRs (singleton pattern)
 	ProtectionConfigMapName = "namespacelabel-protection-config"
