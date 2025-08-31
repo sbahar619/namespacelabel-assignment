@@ -4,25 +4,26 @@ on:
   workflow_run:
     workflows: ["Test"]
     types: [completed]
-    branches: [main, develop, remove-ns-annotations, namespacelabel-operator]  # Only run E2E after Test completes on these branches
   workflow_dispatch:  # Allow manual triggering
   schedule:
     - cron: '0 2 * * *'  # Nightly at 2 AM
 
 env:
-  GO_VERSION: '1.23'
+  GO_VERSION: '1.23.5'
 
 jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    # Only run if Test workflow succeeded or this is a manual/scheduled/PR run
+    # Only run if Test workflow succeeded on allowed branches, or this is manual/scheduled
     if: |
       github.event_name == 'workflow_dispatch' || 
       github.event_name == 'schedule' ||
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        contains('main,develop,remove-ns-annotations,namespacelabel-operator', github.event.workflow_run.head_branch)
+      )
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
