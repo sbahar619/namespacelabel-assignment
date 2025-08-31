@@ -184,7 +184,6 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 		}
 		return nil, fmt.Errorf("failed to read protection ConfigMap '%s/%s': %w", ProtectionNamespace, ProtectionConfigMapName, err)
 	}
-
 	config := &ProtectionConfig{
 		Patterns: []string{},
 		Mode:     ProtectionModeSkip,
