@@ -152,10 +152,10 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 		l.Error(statusErr, "failed to clear applied labels in status")
 	}
 	controllerutil.RemoveFinalizer(&freshCR, FinalizerName)
-	
+
 	// Update the original CR object for test compatibility
 	controllerutil.RemoveFinalizer(cr, FinalizerName)
-	
+
 	return ctrl.Result{}, r.Update(ctx, &freshCR)
 }
 
