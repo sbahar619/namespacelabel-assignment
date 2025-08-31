@@ -405,7 +405,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				},
 				Data: map[string]string{
 					"patterns": "# This is a comment\n- \"kubernetes.io/*\"\n  \n- \"*.k8s.io/*\"  # inline comment\n\n",
-					"mode":     "  fail  ",
+					"mode":     "  " + ProtectionModeFail + "  ",
 				},
 			}
 			Expect(fakeClient.Create(ctx, protectionCM)).To(Succeed())
@@ -441,7 +441,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should allow all labels when no patterns are defined", func() {
-			emptyConfig := &ProtectionConfig{Patterns: []string{}, Mode: "skip"}
+			emptyConfig := &ProtectionConfig{Patterns: []string{}, Mode: ProtectionModeSkip}
 
 			desired := map[string]string{
 				"kubernetes.io/managed-by": "test",

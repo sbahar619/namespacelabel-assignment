@@ -136,7 +136,6 @@ func parseConfigMapPatterns(patternsData string) []string {
 	var patterns []string
 	err := yaml.Unmarshal([]byte(patternsData), &patterns)
 	if err != nil {
-		// If YAML parsing fails, return empty slice (defensive)
 		return []string{}
 	}
 
