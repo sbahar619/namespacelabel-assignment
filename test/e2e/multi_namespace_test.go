@@ -75,7 +75,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			ns3 := createTestNamespace("isolation-3")
 
 			By("Creating different NamespaceLabel CRs in each namespace")
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment": "development",
 					"team":        "backend",
@@ -83,7 +83,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 				},
 			}, ns1)
 
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment": "staging",
 					"team":        "frontend",
@@ -91,7 +91,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 				},
 			}, ns2)
 
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment": "production",
 					"team":        "platform",
@@ -143,7 +143,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 					defer wg.Done()
 					defer GinkgoRecover()
 
-					testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+					testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 						Labels: map[string]string{
 							"namespace-id": fmt.Sprintf("ns-%d", index),
 							"batch":        "concurrent-test",
@@ -172,7 +172,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			ns := createTestNamespace("lifecycle")
 
 			By("Creating NamespaceLabel CR")
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"lifecycle-test": "true",
 					"environment":    "test",
@@ -228,14 +228,14 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			testutils.SetNamespaceLabel(ctx, k8sClient, ns2, "kubernetes.io/managed-by", "system-b")
 
 			By("Creating CRs with conflicting protected labels in both namespaces")
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"app":                      "service-1",
 					"kubernetes.io/managed-by": "operator",
 				},
 			}, ns1)
 
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"app":                      "service-2",
 					"kubernetes.io/managed-by": "operator",

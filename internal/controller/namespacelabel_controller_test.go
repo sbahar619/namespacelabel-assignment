@@ -98,7 +98,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		It("should add finalizer to CR without finalizer", func() {
 			By("Setting up namespace and NamespaceLabel resource without finalizer")
 			testutils.CreateNamespace(ctx, testClient, "test-ns", nil, nil)
-			cr := testutils.CreateNamespaceLabel(ctx, testClient, "labels", "test-ns", map[string]string{"app": "test"})
+			cr := testutils.CreateSimpleCR(ctx, testClient, "labels", "test-ns", map[string]string{"app": "test"})
 
 			By("Reconciling the NamespaceLabel resource")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
@@ -116,7 +116,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			By("Setting up protection ConfigMap and test namespace")
 			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)).To(Succeed())
 			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", nil, nil)
-			cr := testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+			cr := testutils.CreateCR(ctx, testClient, "labels", "test-ns", map[string]string{
 				"app": "test",
 				"env": "prod",
 			}, []string{FinalizerName})
@@ -148,7 +148,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
-			testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+			testutils.CreateCR(ctx, testClient, "labels", "test-ns", map[string]string{
 				"app":                      "test",
 				"kubernetes.io/managed-by": "my-operator",
 			}, []string{FinalizerName})
@@ -174,7 +174,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
-			testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+			testutils.CreateCR(ctx, testClient, "labels", "test-ns", map[string]string{
 				"app":                      "test",
 				"kubernetes.io/managed-by": "my-operator",
 			}, []string{FinalizerName})
@@ -200,7 +200,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
-			testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+			testutils.CreateCR(ctx, testClient, "labels", "test-ns", map[string]string{
 				"app":                      "test",
 				"kubernetes.io/managed-by": "my-operator",
 			}, []string{FinalizerName})
@@ -224,7 +224,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				"old-label": "old-value",
 			}, nil)
 
-			cr := testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+			cr := testutils.CreateCR(ctx, testClient, "labels", "test-ns", map[string]string{
 				"new-label": "new-value",
 			}, []string{FinalizerName})
 
@@ -259,7 +259,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				}
 
 				crName := fmt.Sprintf("test-cr-%d", time.Now().UnixNano())
-				cr := testutils.CreateNamespaceLabelWithCustomMeta(ctx, testClient, crName, crNamespace, nil, []string{FinalizerName}, map[string]string{})
+				cr := testutils.CreateCRWithMeta(ctx, testClient, crName, crNamespace, nil, []string{FinalizerName}, map[string]string{})
 
 				if appliedLabels != nil {
 					var freshCR labelsv1alpha1.NamespaceLabel

@@ -93,7 +93,7 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func(
 
 		It("should prevent creation of second CR with valid name when one already exists", func() {
 			By("Creating the first valid NamespaceLabel CR")
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment": "production",
 				},

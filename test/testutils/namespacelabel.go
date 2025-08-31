@@ -14,7 +14,7 @@ import (
 	"github.com/sbahar619/namespace-label-operator/internal/factory"
 )
 
-func CreateNamespaceLabelWithFinalizers(
+func CreateCR(
 	ctx context.Context,
 	k8sClient client.Client,
 	name, namespace string,
@@ -30,12 +30,12 @@ func CreateNamespaceLabelWithFinalizers(
 		return &existing
 	}
 
-	cr := factory.NewNamespaceLabelWithFinalizers(name, namespace, labels, finalizers)
+	cr := factory.NewCRWithFinalizers(name, namespace, labels, finalizers)
 	Expect(k8sClient.Create(ctx, cr)).To(Succeed())
 	return cr
 }
 
-func CreateNamespaceLabel(
+func CreateSimpleCR(
 	ctx context.Context,
 	k8sClient client.Client,
 	name, namespace string,
@@ -46,7 +46,7 @@ func CreateNamespaceLabel(
 	return cr
 }
 
-func CreateNamespaceLabelWithCustomMeta(
+func CreateCRWithMeta(
 	ctx context.Context,
 	k8sClient client.Client,
 	name, namespace string,
@@ -54,17 +54,17 @@ func CreateNamespaceLabelWithCustomMeta(
 	finalizers []string,
 	specLabels map[string]string,
 ) *labelsv1alpha1.NamespaceLabel {
-	cr := factory.NewNamespaceLabelWithObjectMeta(name, namespace, objectLabels, finalizers, specLabels)
+	cr := factory.NewCRWithMeta(name, namespace, objectLabels, finalizers, specLabels)
 	Expect(k8sClient.Create(ctx, cr)).To(Succeed())
 	return cr
 }
 
-func DeleteNamespaceLabel(ctx context.Context, k8sClient client.Client, name, namespace string) error {
+func DeleteCR(ctx context.Context, k8sClient client.Client, name, namespace string) error {
 	cr := factory.NewNamespaceLabel(name, namespace, nil)
 	return k8sClient.Delete(ctx, cr)
 }
 
-func WaitForNamespaceLabelToExist(ctx context.Context, k8sClient client.Client, name, namespace string) {
+func WaitForCR(ctx context.Context, k8sClient client.Client, name, namespace string) {
 	Eventually(func() error {
 		found := &labelsv1alpha1.NamespaceLabel{}
 		return k8sClient.Get(ctx, types.NamespacedName{
@@ -74,7 +74,7 @@ func WaitForNamespaceLabelToExist(ctx context.Context, k8sClient client.Client, 
 	}, time.Minute, time.Second).Should(Succeed())
 }
 
-func GetNamespaceLabelStatus(
+func GetCRStatus(
 	ctx context.Context,
 	k8sClient client.Client,
 	name, namespace string,
@@ -87,7 +87,7 @@ func GetNamespaceLabelStatus(
 	return &cr.Status
 }
 
-func UpdateNamespaceLabelStatus(
+func UpdateCRStatus(
 	ctx context.Context,
 	k8sClient client.Client,
 	name, namespace string,
@@ -121,7 +121,7 @@ func NewNamespaceLabel(opts CROptions, namespace string) *labelsv1alpha1.Namespa
 	return factory.NewNamespaceLabel(name, namespace, opts.Labels)
 }
 
-func CreateNamespaceLabelFromOptions(
+func CreateCRFromOptions(
 	ctx context.Context,
 	k8sClient client.Client,
 	opts CROptions,
@@ -133,16 +133,16 @@ func CreateNamespaceLabelFromOptions(
 }
 
 func WaitForCRToExist(ctx context.Context, k8sClient client.Client, name, namespace string) {
-	WaitForNamespaceLabelToExist(ctx, k8sClient, name, namespace)
+	WaitForCR(ctx, k8sClient, name, namespace)
 }
 
-func GetCRStatus(
+func GetCRStatusFunc(
 	ctx context.Context,
 	k8sClient client.Client,
 	name, namespace string,
 ) func() *labelsv1alpha1.NamespaceLabelStatus {
 	return func() *labelsv1alpha1.NamespaceLabelStatus {
-		return GetNamespaceLabelStatus(ctx, k8sClient, name, namespace)
+		return GetCRStatus(ctx, k8sClient, name, namespace)
 	}
 }
 

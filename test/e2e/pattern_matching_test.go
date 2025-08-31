@@ -79,7 +79,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 			testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "custom.app.io/owner", "team-a")
 
 			By("Creating CR with nested wildcard protection")
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment":                "production",
 					"app.company.k8s.io/version": "v2.0.0", // Should be protected
@@ -123,7 +123,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 			testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "other.kubernetes.io/label", "existing-value")
 
 			By("Creating CR with overlapping patterns")
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"security.kubernetes.io/enforce": "baseline",          // Conflicts with existing "restricted"
 					"other.kubernetes.io/label":      "new-value",         // Conflicts with existing "existing-value"
@@ -142,7 +142,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 
 			By("Verifying status shows successful application")
 			Eventually(func() bool {
-				status := testutils.GetCRStatus(ctx, k8sClient, "labels", testNS)()
+				status := testutils.GetCRStatusFunc(ctx, k8sClient, "labels", testNS)()
 				if status == nil {
 					return false
 				}
@@ -163,7 +163,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 			})).To(Succeed())
 
 			By("Creating CR with various edge case patterns")
-			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+			testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"test-label":        "value",
 					"unicode-test":      "test-value",
@@ -174,7 +174,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 
 			By("Verifying operator handles edge cases without crashing")
 			Eventually(func() bool {
-				status := testutils.GetCRStatus(ctx, k8sClient, "labels", testNS)()
+				status := testutils.GetCRStatusFunc(ctx, k8sClient, "labels", testNS)()
 				return status != nil && status.Applied == true
 			}, time.Minute, time.Second).Should(BeTrue())
 

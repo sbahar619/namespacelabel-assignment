@@ -16,7 +16,7 @@ func NewNamespaceLabel(name, namespace string, labels map[string]string) *labels
 	}
 }
 
-func NewNamespaceLabelWithFinalizers(name, namespace string, labels map[string]string, finalizers []string) *labelsv1alpha1.NamespaceLabel {
+func NewCRWithFinalizers(name, namespace string, labels map[string]string, finalizers []string) *labelsv1alpha1.NamespaceLabel {
 	return &labelsv1alpha1.NamespaceLabel{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       name,
@@ -27,7 +27,7 @@ func NewNamespaceLabelWithFinalizers(name, namespace string, labels map[string]s
 	}
 }
 
-func NewNamespaceLabelWithObjectMeta(name, namespace string, objectLabels map[string]string, finalizers []string, specLabels map[string]string) *labelsv1alpha1.NamespaceLabel {
+func NewCRWithMeta(name, namespace string, objectLabels map[string]string, finalizers []string, specLabels map[string]string) *labelsv1alpha1.NamespaceLabel {
 	return &labelsv1alpha1.NamespaceLabel{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       name,

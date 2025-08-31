@@ -87,7 +87,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		Context("Basic NamespaceLabel Operations", func() {
 			It("should create a NamespaceLabel CR successfully", func() {
 				By("Creating a NamespaceLabel CR")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"environment": "test",
 						"team":        "platform",
@@ -100,7 +100,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 
 			It("should delete a NamespaceLabel CR successfully", func() {
 				By("Creating a NamespaceLabel CR first")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"test": "delete",
 					},
@@ -126,7 +126,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		Context("Namespace Label Application", func() {
 			It("should apply labels to target namespace", func() {
 				By("Creating a NamespaceLabel CR")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"environment": "production",
 						"team":        "backend",
@@ -153,7 +153,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "kubernetes.io/managed-by", "system")
 
 				By("Creating a NamespaceLabel CR with labels that would normally be protected")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"environment":              "test",
 						"kubernetes.io/managed-by": "namespacelabel-operator",
@@ -171,7 +171,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 		Context("Label Updates and Removal", func() {
 			It("should update existing labels correctly", func() {
 				By("Creating initial labels")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"environment": "development",
 						"version":     "v1.0",
@@ -228,7 +228,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "system.io/critical", "true")
 
 				By("Creating CR with conflicting protected label")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"app":                "test-app",
 						"system.io/critical": "false",
@@ -256,7 +256,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "istio.io/injection", "enabled")
 
 				By("Creating a NamespaceLabel CR with conflicting protected label")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"environment":        "production",
 						"istio.io/injection": "disabled",
@@ -289,7 +289,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "app.kubernetes.io/version", "v1.0.0")
 
 				By("Creating a NamespaceLabel CR with mix of protected and unprotected labels")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"environment":               "production",
 						"team":                      "platform",
@@ -300,7 +300,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 
 				By("Verifying status reflects applied and skipped counts correctly")
 				Eventually(func() bool {
-					status := testutils.GetCRStatus(ctx, k8sClient, "labels", testNS)()
+					status := testutils.GetCRStatusFunc(ctx, k8sClient, "labels", testNS)()
 					if status == nil {
 						return false
 					}
@@ -333,7 +333,7 @@ var _ = Describe("NamespaceLabel Controller Tests", Label("controller"), Serial,
 				testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "kubernetes.io/managed-by", "existing-system")
 
 				By("Creating a NamespaceLabel CR with conflicting protected label")
-				testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
+				testutils.CreateCRFromOptions(ctx, k8sClient, testutils.CROptions{
 					Labels: map[string]string{
 						"environment":              "test",
 						"kubernetes.io/managed-by": "operator",
