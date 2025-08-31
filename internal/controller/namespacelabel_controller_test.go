@@ -149,6 +149,12 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		protectionCM := createProtectionConfigMapObject(patterns, mode)
 		Expect(testClient.Create(ctx, protectionCM)).To(Succeed())
+
+		// Ensure the ConfigMap is readable before proceeding to Reconcile
+		Eventually(func() error {
+			cm := &corev1.ConfigMap{}
+			return testClient.Get(ctx, client.ObjectKey{Name: ProtectionConfigMapName, Namespace: ProtectionNamespace}, cm)
+		}, "5s", "100ms").Should(Succeed())
 	}
 
 	reconcileRequest := func(name, namespace string) reconcile.Request {
