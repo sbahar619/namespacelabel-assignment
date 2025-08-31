@@ -89,6 +89,9 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
 
+    - name: Clean bin directory (force fresh tools)
+      run: rm -rf ./bin/
+
     - name: Install test dependencies
       run: make envtest ginkgo
 
