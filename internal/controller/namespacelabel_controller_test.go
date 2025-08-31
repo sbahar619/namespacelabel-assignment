@@ -437,7 +437,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		It("should handle ConfigMap with only mode specified", func() {
 
 			existingCM := createProtectionConfigMapObject(nil, ProtectionModeSkip)
-			testClient.Delete(ctx, existingCM)
+			_ = testClient.Delete(ctx, existingCM)
 
 			protectionCM := createProtectionConfigMapObject(nil, ProtectionModeSkip)
 			Expect(testClient.Create(ctx, protectionCM)).To(Succeed())

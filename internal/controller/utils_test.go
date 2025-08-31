@@ -23,18 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 )
-
-func createTestNamespace(name string, annotations map[string]string) *corev1.Namespace {
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Annotations: annotations,
-		},
-	}
-	return ns
-}
 
 var _ = Describe("getAppliedLabels", Label("controller"), func() {
 	DescribeTable("status parsing scenarios",
