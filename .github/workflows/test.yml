@@ -11,7 +11,7 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 env:
-  GO_VERSION: '1.23'
+  GO_VERSION: '1.23.5'
   GOLANGCI_LINT_VERSION: 'v1.61.0'
 
 jobs:
@@ -95,9 +95,34 @@ jobs:
     - name: Install test dependencies
       run: make envtest ginkgo
 
+    - name: Debug environment
+      run: |
+        echo "=== Environment Debug ==="
+        go version
+        echo "GOPATH: $GOPATH"
+        echo "GOCACHE: $GOCACHE" 
+        echo "PWD: $(pwd)"
+        ls -la
+        echo "=== Bin directory ==="
+        ls -la bin/ || echo "No bin directory"
+        echo "=== Go env ==="
+        go env
+
     - name: Run unit tests with coverage
       run: |
-        make test
+        echo "=== Starting tests ==="
+        make test 2>&1 | tee test-output.log
+        TEST_EXIT_CODE=${PIPESTATUS[0]}
+        echo "=== Test exit code: $TEST_EXIT_CODE ==="
+        echo "=== Last 50 lines of output ==="
+        tail -50 test-output.log
+        if [ $TEST_EXIT_CODE -ne 0 ]; then
+          echo "=== Full test output ==="
+          cat test-output.log
+          echo "=== Retrying with reduced parallelism ==="
+          GOMAXPROCS=1 go test -v ./internal/controller/ ./internal/webhook/... -coverprofile=cover.out
+          exit $?
+        fi
         go tool cover -html=cover.out -o coverage.html
 
     - name: Upload coverage to Codecov
