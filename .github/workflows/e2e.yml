@@ -7,6 +7,8 @@ on:
   workflow_dispatch:  # Allow manual triggering
   schedule:
     - cron: '0 2 * * *'  # Nightly at 2 AM
+  pull_request:
+    branches: [ main, develop, remove-ns-annotations, namespacelabel-operator ]
 
 env:
   GO_VERSION: '1.23.5'
@@ -15,15 +17,7 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    # Only run if Test workflow succeeded on allowed branches, or this is manual/scheduled
-    if: |
-      github.event_name == 'workflow_dispatch' || 
-      github.event_name == 'schedule' ||
-      (
-        github.event_name == 'workflow_run' &&
-        github.event.workflow_run.conclusion == 'success' &&
-        contains('main,develop,remove-ns-annotations,namespacelabel-operator', github.event.workflow_run.head_branch)
-      )
+    # Triggered by Test workflow completion (configured above), manual, or schedule
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
