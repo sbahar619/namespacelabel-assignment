@@ -7,6 +7,7 @@ import (
 	"time"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"github.com/sbahar619/namespace-label-operator/internal/factory"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -173,7 +174,7 @@ func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, 
 	return changed
 }
 
-func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*ProtectionConfig, error) {
+func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*factory.ProtectionConfig, error) {
 	l := log.FromContext(ctx)
 
 	cm := &corev1.ConfigMap{}
@@ -184,18 +185,12 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return &ProtectionConfig{
-				Patterns: []string{},
-				Mode:     ProtectionModeSkip,
-			}, nil
+			return factory.NewDefaultProtectionConfig(), nil
 		}
 		return nil, fmt.Errorf("failed to read protection ConfigMap '%s/%s': %w", ProtectionNamespace, ProtectionConfigMapName, err)
 	}
 
-	config := &ProtectionConfig{
-		Patterns: []string{},
-		Mode:     ProtectionModeSkip,
-	}
+	config := factory.NewDefaultProtectionConfig()
 
 	if patternsData, exists := cm.Data["patterns"]; exists {
 		config.Patterns = parseConfigMapPatterns(patternsData)
@@ -221,7 +216,7 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*Pr
 func (r *NamespaceLabelReconciler) filterProtectedLabels(
 	desired map[string]string,
 	existing map[string]string,
-	config *ProtectionConfig,
+	config *factory.ProtectionConfig,
 ) (allowed map[string]string, skipped []string, err error) {
 	allowed = make(map[string]string)
 	skipped = []string{}

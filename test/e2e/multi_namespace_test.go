@@ -28,10 +28,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/sbahar619/namespace-label-operator/test/utils"
+	"github.com/sbahar619/namespace-label-operator/internal/factory"
+	"github.com/sbahar619/namespace-label-operator/test/testutils"
 )
 
 var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func() {
@@ -47,16 +47,16 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 
 		By("Setting up Kubernetes client")
 		var err error
-		k8sClient, err = utils.GetK8sClient()
+		k8sClient, err = testutils.GetK8sClient()
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
 		By("Cleaning up all test namespaces")
 		for _, ns := range testNSs {
-			utils.CleanupNamespaceLabels(ctx, k8sClient, ns)
+			testutils.CleanupNamespaceLabels(ctx, k8sClient, ns)
 
-			utils.DeleteTestNamespace(ctx, k8sClient, ns)
+			testutils.DeleteTestNamespace(ctx, k8sClient, ns)
 		}
 	})
 
@@ -64,7 +64,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 		nsName := fmt.Sprintf("multi-test-%s-%d-%d", suffix, time.Now().UnixNano(), rand.Int31())
 		testNSs = append(testNSs, nsName)
 
-		utils.CreateTestNamespace(ctx, k8sClient, nsName, nil)
+		testutils.CreateTestNamespace(ctx, k8sClient, nsName, nil)
 		return nsName
 	}
 
@@ -75,7 +75,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			ns3 := createTestNamespace("isolation-3")
 
 			By("Creating different NamespaceLabel CRs in each namespace")
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment": "development",
 					"team":        "backend",
@@ -83,7 +83,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 				},
 			}, ns1)
 
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment": "staging",
 					"team":        "frontend",
@@ -91,7 +91,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 				},
 			}, ns2)
 
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment": "production",
 					"team":        "platform",
@@ -100,26 +100,26 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			}, ns3)
 
 			By("Verifying each namespace has only its own labels")
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, ns1), time.Minute, time.Second).Should(And(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, ns1), time.Minute, time.Second).Should(And(
 				HaveKeyWithValue("environment", "development"),
 				HaveKeyWithValue("team", "backend"),
 				HaveKeyWithValue("app", "service-a"),
 			))
 
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, ns2), time.Minute, time.Second).Should(And(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, ns2), time.Minute, time.Second).Should(And(
 				HaveKeyWithValue("environment", "staging"),
 				HaveKeyWithValue("team", "frontend"),
 				HaveKeyWithValue("app", "service-b"),
 			))
 
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, ns3), time.Minute, time.Second).Should(And(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, ns3), time.Minute, time.Second).Should(And(
 				HaveKeyWithValue("environment", "production"),
 				HaveKeyWithValue("team", "platform"),
 				HaveKeyWithValue("app", "service-c"),
 			))
 
 			By("Verifying namespaces don't have each other's labels")
-			Consistently(utils.GetNamespaceLabels(ctx, k8sClient, ns1), time.Second*10, time.Second).ShouldNot(And(
+			Consistently(testutils.GetNamespaceLabels(ctx, k8sClient, ns1), time.Second*10, time.Second).ShouldNot(And(
 				HaveKeyWithValue("team", "frontend"),
 				HaveKeyWithValue("app", "service-b"),
 			))
@@ -143,7 +143,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 					defer wg.Done()
 					defer GinkgoRecover()
 
-					utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+					testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 						Labels: map[string]string{
 							"namespace-id": fmt.Sprintf("ns-%d", index),
 							"batch":        "concurrent-test",
@@ -158,7 +158,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			By("Verifying all namespaces have their correct labels")
 			for i := 0; i < numNamespaces; i++ {
 				nsIndex := i // Capture for closure
-				Eventually(utils.GetNamespaceLabels(ctx, k8sClient, namespaces[nsIndex]), time.Minute, time.Second).Should(And(
+				Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, namespaces[nsIndex]), time.Minute, time.Second).Should(And(
 					HaveKeyWithValue("namespace-id", fmt.Sprintf("ns-%d", nsIndex)),
 					HaveKeyWithValue("batch", "concurrent-test"),
 					HaveKeyWithValue("index", fmt.Sprintf("%d", nsIndex)),
@@ -172,7 +172,7 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			ns := createTestNamespace("lifecycle")
 
 			By("Creating NamespaceLabel CR")
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"lifecycle-test": "true",
 					"environment":    "test",
@@ -180,16 +180,12 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			}, ns)
 
 			By("Verifying labels are applied")
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, ns), time.Minute, time.Second).Should(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, ns), time.Minute, time.Second).Should(
 				HaveKeyWithValue("lifecycle-test", "true"),
 			)
 
 			By("Deleting the namespace while CR exists")
-			nsObj := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ns,
-				},
-			}
+			nsObj := factory.NewNamespace(ns, nil, nil)
 			Expect(k8sClient.Delete(ctx, nsObj)).To(Succeed())
 
 			By("Verifying namespace is eventually deleted")
@@ -211,16 +207,16 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 
 	Context("Cross-Namespace Protection Scenarios", Serial, func() {
 		BeforeEach(func() {
-			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
+			Expect(testutils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
 		})
 
 		AfterEach(func() {
-			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = testutils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should handle same protection patterns across different namespaces", func() {
 			By("Setting up protection ConfigMap with skip mode")
-			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
+			Expect(testutils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"kubernetes.io/*",
 			})).To(Succeed())
 
@@ -228,18 +224,18 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			ns2 := createTestNamespace("protection-2")
 
 			By("Pre-setting different protected labels in each namespace")
-			utils.SetNamespaceLabel(ctx, k8sClient, ns1, "kubernetes.io/managed-by", "system-a")
-			utils.SetNamespaceLabel(ctx, k8sClient, ns2, "kubernetes.io/managed-by", "system-b")
+			testutils.SetNamespaceLabel(ctx, k8sClient, ns1, "kubernetes.io/managed-by", "system-a")
+			testutils.SetNamespaceLabel(ctx, k8sClient, ns2, "kubernetes.io/managed-by", "system-b")
 
 			By("Creating CRs with conflicting protected labels in both namespaces")
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"app":                      "service-1",
 					"kubernetes.io/managed-by": "operator",
 				},
 			}, ns1)
 
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"app":                      "service-2",
 					"kubernetes.io/managed-by": "operator",
@@ -247,13 +243,13 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			}, ns2)
 
 			By("Verifying different protection behaviors")
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, ns1), time.Minute, time.Second).Should(And(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, ns1), time.Minute, time.Second).Should(And(
 				HaveKeyWithValue("app", "service-1"),
 				HaveKeyWithValue("kubernetes.io/managed-by", "system-a"),
 			))
 
 			// For ns2, the protected label should remain unchanged due to fail mode
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, ns2), time.Minute, time.Second).Should(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, ns2), time.Minute, time.Second).Should(
 				HaveKeyWithValue("kubernetes.io/managed-by", "system-b"),
 			)
 

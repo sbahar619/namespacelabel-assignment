@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/sbahar619/namespace-label-operator/test/utils"
+	"github.com/sbahar619/namespace-label-operator/test/testutils"
 )
 
 var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, func() {
@@ -42,44 +42,44 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 
 		By("Setting up Kubernetes client")
 		var err error
-		k8sClient, err = utils.GetK8sClient()
+		k8sClient, err = testutils.GetK8sClient()
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating test namespace")
-		utils.CreateTestNamespace(ctx, k8sClient, testNS, nil)
+		testutils.CreateTestNamespace(ctx, k8sClient, testNS, nil)
 	})
 
 	AfterEach(func() {
 		By("Cleaning up test namespace")
-		utils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
+		testutils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
 
-		utils.DeleteTestNamespace(ctx, k8sClient, testNS)
+		testutils.DeleteTestNamespace(ctx, k8sClient, testNS)
 	})
 
 	Context("Nested Wildcard Pattern Tests", Ordered, func() {
 		BeforeAll(func() {
 			By("Setting up protection namespace and nested wildcard patterns")
-			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
-			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
+			Expect(testutils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
+			_ = testutils.DeleteProtectionConfigMap(ctx, k8sClient)
+			Expect(testutils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"*.*.k8s.io/*",
 				"*.istio.io/*",
 			})).To(Succeed())
 		})
 
 		AfterAll(func() {
-			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = testutils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should handle nested wildcard patterns correctly", func() {
 
 			By("Pre-setting nested domain labels")
-			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "app.company.k8s.io/version", "v1.0.0")
-			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "mesh.istio.io/version", "1.17")
-			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "custom.app.io/owner", "team-a")
+			testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "app.company.k8s.io/version", "v1.0.0")
+			testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "mesh.istio.io/version", "1.17")
+			testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "custom.app.io/owner", "team-a")
 
 			By("Creating CR with nested wildcard protection")
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment":                "production",
 					"app.company.k8s.io/version": "v2.0.0", // Should be protected
@@ -90,7 +90,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 			}, testNS)
 
 			By("Verifying complex pattern matching behavior")
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, testNS), time.Minute, time.Second*2).Should(And(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, testNS), time.Minute, time.Second*2).Should(And(
 				HaveKeyWithValue("environment", "production"),            // Applied
 				HaveKeyWithValue("simple-label", "value"),                // Applied
 				HaveKeyWithValue("custom.app.io/owner", "team-b"),        // Applied (doesn't match *.*.k8s.io/*)
@@ -103,9 +103,9 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 
 	Context("Overlapping Kubernetes.io Pattern Tests", Ordered, func() {
 		BeforeAll(func() {
-			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
-			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
+			Expect(testutils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
+			_ = testutils.DeleteProtectionConfigMap(ctx, k8sClient)
+			Expect(testutils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"kubernetes.io/*",
 				"*.kubernetes.io/*",
 				"security.kubernetes.io/*",
@@ -113,17 +113,17 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 		})
 
 		AfterAll(func() {
-			_ = utils.DeleteProtectionConfigMap(ctx, k8sClient)
+			_ = testutils.DeleteProtectionConfigMap(ctx, k8sClient)
 		})
 
 		It("should handle conflicting patterns with proper precedence", func() {
 
 			By("Pre-setting labels that match multiple patterns")
-			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "security.kubernetes.io/enforce", "restricted")
-			utils.SetNamespaceLabel(ctx, k8sClient, testNS, "other.kubernetes.io/label", "existing-value")
+			testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "security.kubernetes.io/enforce", "restricted")
+			testutils.SetNamespaceLabel(ctx, k8sClient, testNS, "other.kubernetes.io/label", "existing-value")
 
 			By("Creating CR with overlapping patterns")
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"security.kubernetes.io/enforce": "baseline",          // Conflicts with existing "restricted"
 					"other.kubernetes.io/label":      "new-value",         // Conflicts with existing "existing-value"
@@ -133,7 +133,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 			}, testNS)
 
 			By("Verifying conflicting labels are protected but new ones are applied")
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, testNS), time.Minute, time.Second).Should(And(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, testNS), time.Minute, time.Second).Should(And(
 				HaveKeyWithValue("security.kubernetes.io/enforce", "restricted"), // Protected (existing+different)
 				HaveKeyWithValue("other.kubernetes.io/label", "existing-value"),  // Protected (existing+different)
 				HaveKeyWithValue("regular-label", "test"),                        // Applied (no pattern match)
@@ -142,7 +142,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 
 			By("Verifying status shows successful application")
 			Eventually(func() bool {
-				status := utils.GetCRStatus(ctx, k8sClient, "labels", testNS)()
+				status := testutils.GetCRStatus(ctx, k8sClient, "labels", testNS)()
 				if status == nil {
 					return false
 				}
@@ -152,8 +152,8 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 
 		It("should handle malformed and edge case patterns gracefully", func() {
 			By("Setting up protection ConfigMap with edge case patterns")
-			Expect(utils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
-			Expect(utils.CreateSkipModeConfig(ctx, k8sClient, []string{
+			Expect(testutils.EnsureProtectionNamespace(ctx, k8sClient)).To(Succeed())
+			Expect(testutils.CreateSkipModeConfig(ctx, k8sClient, []string{
 				"",            // Empty pattern
 				"*",           // Match everything (should block all)
 				"**/*",        // Double wildcard
@@ -163,7 +163,7 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 			})).To(Succeed())
 
 			By("Creating CR with various edge case patterns")
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"test-label":        "value",
 					"unicode-test":      "test-value",
@@ -174,13 +174,13 @@ var _ = Describe("Advanced Pattern Matching Tests", Label("patterns"), Serial, f
 
 			By("Verifying operator handles edge cases without crashing")
 			Eventually(func() bool {
-				status := utils.GetCRStatus(ctx, k8sClient, "labels", testNS)()
+				status := testutils.GetCRStatus(ctx, k8sClient, "labels", testNS)()
 				return status != nil && status.Applied == true
 			}, time.Minute, time.Second).Should(BeTrue())
 
 			By("Verifying labels are applied correctly (protection only affects existing+conflicting labels)")
 
-			Eventually(utils.GetNamespaceLabels(ctx, k8sClient, testNS), time.Minute, time.Second).Should(And(
+			Eventually(testutils.GetNamespaceLabels(ctx, k8sClient, testNS), time.Minute, time.Second).Should(And(
 				HaveKeyWithValue("test-label", "value"),                  // Applied (new label)
 				HaveKeyWithValue("unicode-test", "test-value"),           // Applied (new label)
 				HaveKeyWithValue("very-long-label", "short-value"),       // Applied (new label)

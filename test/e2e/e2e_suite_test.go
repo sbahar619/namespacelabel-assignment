@@ -32,12 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
-	"github.com/sbahar619/namespace-label-operator/test/utils"
+	"github.com/sbahar619/namespace-label-operator/test/testutils"
 )
 
 var k8sClient client.Client
 
-// Run e2e tests using the Ginkgo runner.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
 	_, _ = fmt.Fprintf(GinkgoWriter, "Starting namespacelabel suite\n")
@@ -49,7 +48,7 @@ var _ = BeforeSuite(func() {
 
 	By("checking cluster connectivity")
 	var err error
-	k8sClient, err = utils.GetK8sClient()
+	k8sClient, err = testutils.GetK8sClient()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
@@ -68,11 +67,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Set the global test client for utils package to use
-	utils.GlobalTestClient = k8sClient
+	testutils.GlobalTestClient = k8sClient
 })
 
 var _ = AfterSuite(func() {
 	By("cleaning up")
 	// Clear the global test client
-	utils.GlobalTestClient = nil
+	testutils.GlobalTestClient = nil
 })

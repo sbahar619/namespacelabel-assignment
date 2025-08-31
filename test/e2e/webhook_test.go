@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/sbahar619/namespace-label-operator/test/utils"
+	"github.com/sbahar619/namespace-label-operator/test/testutils"
 )
 
 var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func() {
@@ -47,22 +47,22 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func(
 
 		By("Setting up Kubernetes client")
 		var err error
-		k8sClient, err = utils.GetK8sClient()
+		k8sClient, err = testutils.GetK8sClient()
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating test namespace")
-		utils.CreateTestNamespace(ctx, k8sClient, testNS, nil)
+		testutils.CreateTestNamespace(ctx, k8sClient, testNS, nil)
 	})
 
 	AfterEach(func() {
 		By("Cleaning up test namespace")
 
 		By("Cleaning up NamespaceLabel CRs to remove finalizers")
-		utils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
+		testutils.CleanupNamespaceLabels(ctx, k8sClient, testNS)
 
 		// Now delete the namespace
 		By("Deleting the test namespace")
-		utils.DeleteTestNamespace(ctx, k8sClient, testNS)
+		testutils.DeleteTestNamespace(ctx, k8sClient, testNS)
 
 		// Wait for namespace to be fully deleted
 		By("Waiting for namespace to be fully deleted")
@@ -77,14 +77,14 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func(
 	Context("Name Validation", func() {
 		It("should reject invalid CR names", func() {
 			By("Creating a NamespaceLabel CR with invalid name and expecting webhook rejection")
-			cr := utils.NewNamespaceLabel(utils.CROptions{
+			cr := testutils.NewNamespaceLabel(testutils.CROptions{
 				Name: "invalid-name",
 				Labels: map[string]string{
 					"test": "value",
 				},
 			}, testNS)
 
-			utils.ExpectWebhookRejection(ctx, k8sClient, cr,
+			testutils.ExpectWebhookRejection(ctx, k8sClient, cr,
 				"NamespaceLabel resource must be named 'labels' for singleton pattern enforcement")
 		})
 	})
@@ -93,14 +93,14 @@ var _ = Describe("NamespaceLabel Webhook Tests", Label("webhook"), Serial, func(
 
 		It("should prevent creation of second CR with valid name when one already exists", func() {
 			By("Creating the first valid NamespaceLabel CR")
-			utils.CreateNamespaceLabel(ctx, k8sClient, utils.CROptions{
+			testutils.CreateNamespaceLabelFromOptions(ctx, k8sClient, testutils.CROptions{
 				Labels: map[string]string{
 					"environment": "production",
 				},
 			}, testNS)
 
 			By("Attempting to create a second NamespaceLabel CR with the same valid name")
-			cr2 := utils.NewNamespaceLabel(utils.CROptions{
+			cr2 := testutils.NewNamespaceLabel(testutils.CROptions{
 				Name: "labels", // Same name as first CR
 				Labels: map[string]string{
 					"team": "platform",

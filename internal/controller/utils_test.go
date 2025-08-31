@@ -22,17 +22,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"github.com/sbahar619/namespace-label-operator/internal/factory"
 )
 
 var _ = Describe("getAppliedLabels", Label("controller"), func() {
 	DescribeTable("status parsing scenarios",
 		func(appliedLabels map[string]string, expectedResult map[string]string) {
-			cr := &labelsv1alpha1.NamespaceLabel{
-				Status: labelsv1alpha1.NamespaceLabelStatus{
-					AppliedLabels: appliedLabels,
-				},
-			}
+			cr := factory.NewNamespaceLabel("test", "test-ns", nil)
+			cr.Status.AppliedLabels = appliedLabels
 			result := getAppliedLabels(cr)
 			Expect(result).To(Equal(expectedResult))
 		},
@@ -178,9 +175,7 @@ var _ = Describe("isLabelProtected", func() {
 
 var _ = Describe("updateStatus", func() {
 	It("should update status fields correctly for success", func() {
-		cr := &labelsv1alpha1.NamespaceLabel{
-			Status: labelsv1alpha1.NamespaceLabelStatus{},
-		}
+		cr := factory.NewNamespaceLabel("test", "test-ns", nil)
 
 		updateStatus(cr, true, "Synced", "Labels applied successfully")
 
@@ -195,9 +190,7 @@ var _ = Describe("updateStatus", func() {
 	})
 
 	It("should update status fields correctly for failure", func() {
-		cr := &labelsv1alpha1.NamespaceLabel{
-			Status: labelsv1alpha1.NamespaceLabelStatus{},
-		}
+		cr := factory.NewNamespaceLabel("test", "test-ns", nil)
 
 		updateStatus(cr, false, "InvalidName", "CR must be named 'labels'")
 

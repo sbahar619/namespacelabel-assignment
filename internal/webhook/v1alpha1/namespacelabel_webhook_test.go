@@ -22,11 +22,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"github.com/sbahar619/namespace-label-operator/internal/factory"
 )
 
 var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
@@ -49,15 +49,7 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 				fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 				validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-				obj := &labelsv1alpha1.NamespaceLabel{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "labels",
-						Namespace: "test-ns",
-					},
-					Spec: labelsv1alpha1.NamespaceLabelSpec{
-						Labels: map[string]string{"env": "test"},
-					},
-				}
+				obj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
 
 				warnings, err := validator.ValidateCreate(ctx, obj)
 				Expect(err).NotTo(HaveOccurred())
@@ -68,15 +60,7 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 				fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 				validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-				obj := &labelsv1alpha1.NamespaceLabel{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "invalid-name",
-						Namespace: "test-ns",
-					},
-					Spec: labelsv1alpha1.NamespaceLabelSpec{
-						Labels: map[string]string{"env": "test"},
-					},
-				}
+				obj := factory.NewNamespaceLabel("invalid-name", "test-ns", map[string]string{"env": "test"})
 
 				warnings, err := validator.ValidateCreate(ctx, obj)
 				Expect(err).To(HaveOccurred())
@@ -90,15 +74,7 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 				fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 				validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-				obj := &labelsv1alpha1.NamespaceLabel{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "labels",
-						Namespace: "test-ns",
-					},
-					Spec: labelsv1alpha1.NamespaceLabelSpec{
-						Labels: map[string]string{"env": "test"},
-					},
-				}
+				obj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
 
 				warnings, err := validator.ValidateCreate(ctx, obj)
 				Expect(err).NotTo(HaveOccurred())
@@ -106,15 +82,7 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 			})
 
 			It("should reject creation when another NamespaceLabel already exists", func() {
-				existing := &labelsv1alpha1.NamespaceLabel{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "labels",
-						Namespace: "test-ns",
-					},
-					Spec: labelsv1alpha1.NamespaceLabelSpec{
-						Labels: map[string]string{"existing": "label"},
-					},
-				}
+				existing := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"existing": "label"})
 
 				fakeClient := fake.NewClientBuilder().
 					WithScheme(scheme).
@@ -122,15 +90,7 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 					Build()
 				validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-				obj := &labelsv1alpha1.NamespaceLabel{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "labels",
-						Namespace: "test-ns",
-					},
-					Spec: labelsv1alpha1.NamespaceLabelSpec{
-						Labels: map[string]string{"env": "test"},
-					},
-				}
+				obj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
 
 				warnings, err := validator.ValidateCreate(ctx, obj)
 				Expect(err).To(HaveOccurred())
@@ -142,15 +102,7 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 
 	Describe("ValidateUpdate", func() {
 		It("should allow valid updates", func() {
-			existing := &labelsv1alpha1.NamespaceLabel{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "labels",
-					Namespace: "test-ns",
-				},
-				Spec: labelsv1alpha1.NamespaceLabelSpec{
-					Labels: map[string]string{"env": "test"},
-				},
-			}
+			existing := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
@@ -158,18 +110,10 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 				Build()
 			validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-			newObj := &labelsv1alpha1.NamespaceLabel{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "labels",
-					Namespace: "test-ns",
-				},
-				Spec: labelsv1alpha1.NamespaceLabelSpec{
-					Labels: map[string]string{
-						"env":  "production",
-						"tier": "backend",
-					},
-				},
-			}
+			newObj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{
+				"env":  "production",
+				"tier": "backend",
+			})
 
 			warnings, err := validator.ValidateUpdate(ctx, existing, newObj)
 			Expect(err).NotTo(HaveOccurred())
@@ -180,25 +124,9 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-			oldObj := &labelsv1alpha1.NamespaceLabel{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "labels",
-					Namespace: "test-ns",
-				},
-				Spec: labelsv1alpha1.NamespaceLabelSpec{
-					Labels: map[string]string{"env": "test"},
-				},
-			}
+			oldObj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
 
-			newObj := &labelsv1alpha1.NamespaceLabel{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "different-name",
-					Namespace: "test-ns",
-				},
-				Spec: labelsv1alpha1.NamespaceLabelSpec{
-					Labels: map[string]string{"env": "test"},
-				},
-			}
+			newObj := factory.NewNamespaceLabel("different-name", "test-ns", map[string]string{"env": "test"})
 
 			warnings, err := validator.ValidateUpdate(ctx, oldObj, newObj)
 			Expect(err).To(HaveOccurred())
@@ -212,12 +140,7 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-			obj := &labelsv1alpha1.NamespaceLabel{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "labels",
-					Namespace: "test-ns",
-				},
-			}
+			obj := factory.NewNamespaceLabel("labels", "test-ns", nil)
 
 			warnings, err := validator.ValidateDelete(ctx, obj)
 			Expect(err).NotTo(HaveOccurred())

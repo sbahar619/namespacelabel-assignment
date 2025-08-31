@@ -18,15 +18,12 @@ package controller
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"github.com/sbahar619/namespace-label-operator/internal/factory"
+	"github.com/sbahar619/namespace-label-operator/test/testutils"
 )
 
 var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
@@ -57,112 +56,16 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		}
 		ctx = context.TODO()
 
-		protectionNS := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: ProtectionNamespace,
-			},
-		}
+		protectionNS := factory.NewNamespace(ProtectionNamespace, nil, nil)
 		if err := testClient.Create(ctx, protectionNS); err != nil && !apierrors.IsAlreadyExists(err) {
 			Expect(err).NotTo(HaveOccurred())
 		}
 	})
 
 	AfterEach(func() {
-		existingCM := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ProtectionConfigMapName,
-				Namespace: ProtectionNamespace,
-			},
-		}
+		existingCM := factory.NewConfigMap(ProtectionConfigMapName, ProtectionNamespace, nil, nil)
 		_ = testClient.Delete(ctx, existingCM)
 	})
-
-	createNamespace := func(name string, labels map[string]string, annotations map[string]string) *corev1.Namespace {
-		var existing corev1.Namespace
-		if err := testClient.Get(ctx, client.ObjectKey{Name: name}, &existing); err == nil {
-			existing.Labels = labels
-			existing.Annotations = annotations
-			Expect(testClient.Update(ctx, &existing)).To(Succeed())
-			return &existing
-		}
-
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        name,
-				Labels:      labels,
-				Annotations: annotations,
-			},
-		}
-		Expect(testClient.Create(ctx, ns)).To(Succeed())
-		return ns
-	}
-
-	createCR := func(name, namespace string, labels map[string]string, finalizers []string, spec labelsv1alpha1.NamespaceLabelSpec) *labelsv1alpha1.NamespaceLabel {
-		var existing labelsv1alpha1.NamespaceLabel
-		err := testClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &existing)
-		if err == nil {
-			existing.Labels = labels
-			existing.Finalizers = finalizers
-			existing.Spec = spec
-			Expect(testClient.Update(ctx, &existing)).To(Succeed())
-			return &existing
-		}
-
-		cr := &labelsv1alpha1.NamespaceLabel{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       name,
-				Namespace:  namespace,
-				Labels:     labels,
-				Finalizers: finalizers,
-			},
-			Spec: spec,
-		}
-		Expect(testClient.Create(ctx, cr)).To(Succeed())
-		return cr
-	}
-
-	createProtectionConfigMapObject := func(patterns []string, mode string) *corev1.ConfigMap {
-		data := map[string]string{
-			"mode": mode,
-		}
-
-		if len(patterns) > 0 {
-			patternLines := make([]string, len(patterns))
-			for i, pattern := range patterns {
-				patternLines[i] = fmt.Sprintf("- \"%s\"", pattern)
-			}
-			data["patterns"] = strings.Join(patternLines, "\n")
-		}
-
-		return &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ProtectionConfigMapName,
-				Namespace: ProtectionNamespace,
-			},
-			Data: data,
-		}
-	}
-
-	createProtectionConfigMap := func(patterns []string, mode string) {
-		existingCM := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ProtectionConfigMapName,
-				Namespace: ProtectionNamespace,
-			},
-		}
-		_ = testClient.Delete(ctx, existingCM)
-
-		protectionCM := createProtectionConfigMapObject(patterns, mode)
-		Expect(testClient.Create(ctx, protectionCM)).To(Succeed())
-
-		Eventually(func() bool {
-			cm := &corev1.ConfigMap{}
-			if err := testClient.Get(ctx, client.ObjectKey{Name: ProtectionConfigMapName, Namespace: ProtectionNamespace}, cm); err != nil {
-				return false
-			}
-			return cm.Data["mode"] == mode
-		}, "5s", "100ms").Should(BeTrue())
-	}
 
 	reconcileRequest := func(name, namespace string) reconcile.Request {
 		return reconcile.Request{
@@ -181,8 +84,8 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 	Describe("Reconcile", func() {
 		It("should handle non-existent CR gracefully", func() {
-			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)
-			createNamespace("test-ns", nil, nil)
+			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)).To(Succeed())
+			testutils.CreateNamespace(ctx, testClient, "test-ns", nil, nil)
 
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
 
@@ -192,10 +95,8 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should add finalizer to CR without finalizer", func() {
 			By("Setting up namespace and NamespaceLabel resource without finalizer")
-			createNamespace("test-ns", nil, nil)
-			cr := createCR("labels", "test-ns", nil, nil, labelsv1alpha1.NamespaceLabelSpec{
-				Labels: map[string]string{"app": "test"},
-			})
+			testutils.CreateNamespace(ctx, testClient, "test-ns", nil, nil)
+			cr := testutils.CreateNamespaceLabel(ctx, testClient, "labels", "test-ns", map[string]string{"app": "test"})
 
 			By("Reconciling the NamespaceLabel resource")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
@@ -211,14 +112,12 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should apply labels to namespace successfully", func() {
 			By("Setting up protection ConfigMap and test namespace")
-			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)
-			ns := createNamespace("test-ns", nil, nil)
-			cr := createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
-				Labels: map[string]string{
-					"app": "test",
-					"env": "prod",
-				},
-			})
+			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)).To(Succeed())
+			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", nil, nil)
+			cr := testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+				"app": "test",
+				"env": "prod",
+			}, []string{FinalizerName})
 
 			By("Reconciling the NamespaceLabel resource")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
@@ -241,18 +140,16 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should create protection ConfigMap and apply protection by default", func() {
 			By("Creating protection ConfigMap with fail mode")
-			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeFail)
+			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeFail)).To(Succeed())
 
 			By("Setting up namespace with existing protected label")
-			ns := createNamespace("test-ns", map[string]string{
+			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
-			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
-				Labels: map[string]string{
-					"app":                      "test",
-					"kubernetes.io/managed-by": "my-operator",
-				},
-			})
+			testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+				"app":                      "test",
+				"kubernetes.io/managed-by": "my-operator",
+			}, []string{FinalizerName})
 
 			By("Reconciling and expecting failure due to protected label conflict")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
@@ -269,18 +166,16 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should skip protected labels when ConfigMap exists with skip mode", func() {
 			By("Creating protection ConfigMap with skip mode")
-			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)
+			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)).To(Succeed())
 
 			By("Setting up namespace with existing protected label")
-			ns := createNamespace("test-ns", map[string]string{
+			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
-			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
-				Labels: map[string]string{
-					"app":                      "test",
-					"kubernetes.io/managed-by": "my-operator",
-				},
-			})
+			testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+				"app":                      "test",
+				"kubernetes.io/managed-by": "my-operator",
+			}, []string{FinalizerName})
 
 			By("Reconciling the NamespaceLabel resource")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
@@ -297,18 +192,16 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should fail reconciliation when ConfigMap exists with fail mode", func() {
 			By("Creating protection ConfigMap with fail mode")
-			createProtectionConfigMap([]string{"kubernetes.io/*"}, ProtectionModeFail)
+			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*"}, ProtectionModeFail)).To(Succeed())
 
 			By("Setting up namespace with existing protected label")
-			ns := createNamespace("test-ns", map[string]string{
+			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{
 				"kubernetes.io/managed-by": "existing-operator",
 			}, nil)
-			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
-				Labels: map[string]string{
-					"app":                      "test",
-					"kubernetes.io/managed-by": "my-operator",
-				},
-			})
+			testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+				"app":                      "test",
+				"kubernetes.io/managed-by": "my-operator",
+			}, []string{FinalizerName})
 
 			By("Reconciling and expecting failure due to protected label conflict")
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
@@ -324,16 +217,14 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should handle label updates when spec changes", func() {
-			createProtectionConfigMap([]string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)
-			ns := createNamespace("test-ns", map[string]string{
+			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)).To(Succeed())
+			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{
 				"old-label": "old-value",
 			}, nil)
 
-			cr := createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
-				Labels: map[string]string{
-					"new-label": "new-value",
-				},
-			})
+			cr := testutils.CreateNamespaceLabelWithFinalizers(ctx, testClient, "labels", "test-ns", map[string]string{
+				"new-label": "new-value",
+			}, []string{FinalizerName})
 
 			cr.Status.AppliedLabels = map[string]string{"old-label": "old-value"}
 			Expect(testClient.Status().Update(ctx, cr)).To(Succeed())
@@ -365,7 +256,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 					ns = setupNamespace()
 				}
 
-				cr := createCR("test-cr", crNamespace, nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{})
+				cr := testutils.CreateNamespaceLabelWithCustomMeta(ctx, testClient, "test-cr", crNamespace, nil, []string{FinalizerName}, map[string]string{})
 
 				if appliedLabels != nil {
 					var freshCR labelsv1alpha1.NamespaceLabel
@@ -405,15 +296,15 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			},
 			Entry("namespace not found",
 				func() *corev1.Namespace {
-					return createNamespace("test-ns", nil, nil)
+					return testutils.CreateNamespace(ctx, testClient, "test-ns", nil, nil)
 				}, "test-ns", false, nil, nil),
 			Entry("namespace with no applied labels",
 				func() *corev1.Namespace {
-					return createNamespace("test-ns", map[string]string{"existing": "label"}, nil)
+					return testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{"existing": "label"}, nil)
 				}, "test-ns", true, map[string]string{"existing": "label"}, nil),
 			Entry("namespace with applied labels to remove",
 				func() *corev1.Namespace {
-					return createNamespace("test-ns",
+					return testutils.CreateNamespace(ctx, testClient, "test-ns",
 						map[string]string{
 							"applied-by-operator": "value1",
 							"another-applied":     "value2",
@@ -425,7 +316,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 	Describe("applyLabelsToNamespace", func() {
 		It("should apply labels to namespace", func() {
-			ns := createNamespace("test-ns", map[string]string{
+			ns := testutils.CreateNamespace(ctx, testClient, "test-ns", map[string]string{
 				"existing": "label",
 			}, nil)
 
@@ -449,8 +340,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 	Describe("getProtectionConfig", func() {
 		It("should parse ConfigMap with patterns and mode correctly", func() {
-			protectionCM := createProtectionConfigMapObject([]string{"kubernetes.io/*", "*.k8s.io/*", "istio.io/*"}, ProtectionModeFail)
-			Expect(testClient.Create(ctx, protectionCM)).To(Succeed())
+			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*", "*.k8s.io/*", "istio.io/*"}, ProtectionModeFail)).To(Succeed())
 
 			config, err := reconciler.getProtectionConfig(ctx)
 
@@ -461,16 +351,15 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should handle ConfigMap with comments and extra whitespace", func() {
-			protectionCM := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      ProtectionConfigMapName,
-					Namespace: ProtectionNamespace,
-				},
-				Data: map[string]string{
+			protectionCM := factory.NewConfigMap(
+				ProtectionConfigMapName,
+				ProtectionNamespace,
+				map[string]string{
 					"patterns": "# This is a comment\n- \"kubernetes.io/*\"\n  \n- \"*.k8s.io/*\"  # inline comment\n\n",
 					"mode":     "  " + ProtectionModeFail + "  ",
 				},
-			}
+				nil,
+			)
 			if err := testClient.Create(ctx, protectionCM); err != nil && !apierrors.IsAlreadyExists(err) {
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -484,11 +373,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		It("should handle ConfigMap with only mode specified", func() {
 
-			existingCM := createProtectionConfigMapObject(nil, ProtectionModeSkip)
-			_ = testClient.Delete(ctx, existingCM)
-
-			protectionCM := createProtectionConfigMapObject(nil, ProtectionModeSkip)
-			Expect(testClient.Create(ctx, protectionCM)).To(Succeed())
+			Expect(testutils.CreateNoProtectionConfig(ctx, testClient)).To(Succeed())
 
 			config, err := reconciler.getProtectionConfig(ctx)
 
@@ -499,17 +384,14 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	})
 
 	Describe("filterProtectedLabels", func() {
-		var testConfig *ProtectionConfig
+		var testConfig *factory.ProtectionConfig
 
 		BeforeEach(func() {
-			testConfig = &ProtectionConfig{
-				Patterns: []string{"kubernetes.io/*", "*.k8s.io/*"},
-				Mode:     ProtectionModeSkip,
-			}
+			testConfig = factory.NewProtectionConfig([]string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeSkip)
 		})
 
 		It("should allow all labels when no patterns are defined", func() {
-			emptyConfig := &ProtectionConfig{Patterns: []string{}, Mode: ProtectionModeSkip}
+			emptyConfig := factory.NewDefaultProtectionConfig()
 
 			desired := map[string]string{
 				"kubernetes.io/managed-by": "test",
@@ -547,10 +429,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should fail in fail mode when protected labels conflict", func() {
-			failConfig := &ProtectionConfig{
-				Patterns: []string{"kubernetes.io/*", "*.k8s.io/*"},
-				Mode:     ProtectionModeFail,
-			}
+			failConfig := factory.NewProtectionConfig([]string{"kubernetes.io/*", "*.k8s.io/*"}, ProtectionModeFail)
 
 			desired := map[string]string{
 				"kubernetes.io/managed-by": "new-value",
