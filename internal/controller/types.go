@@ -7,7 +7,7 @@ import (
 
 const (
 	FinalizerName           = "labels.shahaf.com/finalizer"
-	StandardCRName          = "labels" // Standard name for NamespaceLabel CRs (singleton pattern)
+	StandardCRName          = "labels"
 	ProtectionConfigMapName = "namespacelabel-protection-config"
 	ProtectionNamespace     = "namespacelabel-system"
 
