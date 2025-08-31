@@ -198,7 +198,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			createCR("labels", "test-ns", nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{
 				Labels: map[string]string{
 					"app":                      "test",
-					"kubernetes.io/managed-by": "my-operator", // Should be blocked by protection
+					"kubernetes.io/managed-by": "my-operator",
 				},
 			})
 
@@ -433,7 +433,6 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		var testConfig *ProtectionConfig
 
 		BeforeEach(func() {
-			// Create fresh config for each test to avoid pollution
 			testConfig = &ProtectionConfig{
 				Patterns: []string{"kubernetes.io/*", "*.k8s.io/*"},
 				Mode:     ProtectionModeSkip,
@@ -521,13 +520,13 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				"kubernetes.io/managed-by": "new-value",
 				"app":                      "myapp",
 			}
-			existing := map[string]string{} // No existing protected label
+			existing := map[string]string{}
 
 			allowed, skipped, err := reconciler.filterProtectedLabels(desired, existing, testConfig)
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(allowed).To(Equal(desired)) // Both labels should be allowed
-			Expect(skipped).To(BeEmpty())      // Nothing should be skipped for new labels
+			Expect(allowed).To(Equal(desired))
+			Expect(skipped).To(BeEmpty())
 		})
 	})
 })
