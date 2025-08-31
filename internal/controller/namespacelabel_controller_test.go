@@ -92,6 +92,17 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	}
 
 	createCR := func(name, namespace string, labels map[string]string, finalizers []string, spec labelsv1alpha1.NamespaceLabelSpec) *labelsv1alpha1.NamespaceLabel {
+		// Upsert semantics: if exists, update it to ensure correct spec per test
+		var existing labelsv1alpha1.NamespaceLabel
+		err := testClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &existing)
+		if err == nil {
+			existing.Labels = labels
+			existing.Finalizers = finalizers
+			existing.Spec = spec
+			Expect(testClient.Update(ctx, &existing)).To(Succeed())
+			return &existing
+		}
+
 		cr := &labelsv1alpha1.NamespaceLabel{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:       name,
@@ -101,9 +112,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			},
 			Spec: spec,
 		}
-		if err := testClient.Create(ctx, cr); err != nil && !apierrors.IsAlreadyExists(err) {
-			Expect(err).NotTo(HaveOccurred())
-		}
+		Expect(testClient.Create(ctx, cr)).To(Succeed())
 		return cr
 	}
 
