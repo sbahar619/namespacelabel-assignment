@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -256,7 +258,8 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 					ns = setupNamespace()
 				}
 
-				cr := testutils.CreateNamespaceLabelWithCustomMeta(ctx, testClient, "test-cr", crNamespace, nil, []string{FinalizerName}, map[string]string{})
+				crName := fmt.Sprintf("test-cr-%d", time.Now().UnixNano())
+				cr := testutils.CreateNamespaceLabelWithCustomMeta(ctx, testClient, crName, crNamespace, nil, []string{FinalizerName}, map[string]string{})
 
 				if appliedLabels != nil {
 					var freshCR labelsv1alpha1.NamespaceLabel
