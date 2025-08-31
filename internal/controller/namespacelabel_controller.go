@@ -135,7 +135,7 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 	if err := r.Get(ctx, client.ObjectKeyFromObject(cr), &freshCR); err != nil {
 		return ctrl.Result{}, err
 	}
-	
+
 	prevApplied := getAppliedLabels(&freshCR)
 	changed := r.applyLabelsToNamespace(ns, map[string]string{}, prevApplied)
 	if changed {
