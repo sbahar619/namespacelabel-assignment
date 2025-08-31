@@ -78,6 +78,14 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	})
 
 	createNamespace := func(name string, labels map[string]string, annotations map[string]string) *corev1.Namespace {
+		var existing corev1.Namespace
+		if err := testClient.Get(ctx, client.ObjectKey{Name: name}, &existing); err == nil {
+			existing.Labels = labels
+			existing.Annotations = annotations
+			Expect(testClient.Update(ctx, &existing)).To(Succeed())
+			return &existing
+		}
+
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        name,
@@ -85,9 +93,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				Annotations: annotations,
 			},
 		}
-		if err := testClient.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
-			Expect(err).NotTo(HaveOccurred())
-		}
+		Expect(testClient.Create(ctx, ns)).To(Succeed())
 		return ns
 	}
 
@@ -366,6 +372,14 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 					Expect(testClient.Get(ctx, client.ObjectKeyFromObject(cr), &freshCR)).To(Succeed())
 					freshCR.Status.AppliedLabels = appliedLabels
 					Expect(testClient.Status().Update(ctx, &freshCR)).To(Succeed())
+
+					Eventually(func() map[string]string {
+						var checkCR labelsv1alpha1.NamespaceLabel
+						if err := testClient.Get(ctx, client.ObjectKeyFromObject(cr), &checkCR); err != nil {
+							return nil
+						}
+						return checkCR.Status.AppliedLabels
+					}, "5s", "100ms").Should(Equal(appliedLabels))
 				}
 
 				result, err := reconciler.finalize(ctx, cr)
