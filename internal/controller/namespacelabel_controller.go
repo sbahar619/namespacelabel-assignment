@@ -131,7 +131,12 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 		return ctrl.Result{}, err
 	}
 
-	prevApplied := getAppliedLabels(cr)
+	var freshCR labelsv1alpha1.NamespaceLabel
+	if err := r.Get(ctx, client.ObjectKeyFromObject(cr), &freshCR); err != nil {
+		return ctrl.Result{}, err
+	}
+	
+	prevApplied := getAppliedLabels(&freshCR)
 	changed := r.applyLabelsToNamespace(ns, map[string]string{}, prevApplied)
 	if changed {
 		if err := r.Update(ctx, ns); err != nil {
@@ -140,12 +145,12 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 		}
 	}
 
-	cr.Status.AppliedLabels = map[string]string{}
-	if statusErr := r.Status().Update(ctx, cr); statusErr != nil {
+	freshCR.Status.AppliedLabels = map[string]string{}
+	if statusErr := r.Status().Update(ctx, &freshCR); statusErr != nil {
 		l.Error(statusErr, "failed to clear applied labels in status")
 	}
-	controllerutil.RemoveFinalizer(cr, FinalizerName)
-	return ctrl.Result{}, r.Update(ctx, cr)
+	controllerutil.RemoveFinalizer(&freshCR, FinalizerName)
+	return ctrl.Result{}, r.Update(ctx, &freshCR)
 }
 
 func (r *NamespaceLabelReconciler) getTargetNamespace(ctx context.Context, targetNS string) (*corev1.Namespace, error) {

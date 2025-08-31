@@ -362,8 +362,10 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				cr := createCR("test-cr", crNamespace, nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{})
 
 				if appliedLabels != nil {
-					cr.Status.AppliedLabels = appliedLabels
-					Expect(testClient.Status().Update(ctx, cr)).To(Succeed())
+					var freshCR labelsv1alpha1.NamespaceLabel
+					Expect(testClient.Get(ctx, client.ObjectKeyFromObject(cr), &freshCR)).To(Succeed())
+					freshCR.Status.AppliedLabels = appliedLabels
+					Expect(testClient.Status().Update(ctx, &freshCR)).To(Succeed())
 				}
 
 				result, err := reconciler.finalize(ctx, cr)
