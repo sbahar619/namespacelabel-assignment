@@ -75,6 +75,28 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			},
 		}
 		_ = testClient.Delete(ctx, existingCM)
+
+		for _, crName := range []string{"labels", "test-cr"} {
+			cr := &labelsv1alpha1.NamespaceLabel{}
+			if err := testClient.Get(ctx, client.ObjectKey{Name: crName, Namespace: "test-ns"}, cr); err == nil {
+				_ = testClient.Delete(ctx, cr)
+			}
+		}
+
+		ns := &corev1.Namespace{}
+		if err := testClient.Get(ctx, client.ObjectKey{Name: "test-ns"}, ns); err == nil {
+			_ = testClient.Delete(ctx, ns)
+		}
+
+		Eventually(func() bool {
+			cm := &corev1.ConfigMap{}
+			cmErr := testClient.Get(ctx, client.ObjectKey{Name: ProtectionConfigMapName, Namespace: ProtectionNamespace}, cm)
+			cr := &labelsv1alpha1.NamespaceLabel{}
+			crErr := testClient.Get(ctx, client.ObjectKey{Name: "labels", Namespace: "test-ns"}, cr)
+			ns := &corev1.Namespace{}
+			nsErr := testClient.Get(ctx, client.ObjectKey{Name: "test-ns"}, ns)
+			return cmErr != nil && crErr != nil && nsErr != nil
+		}, "5s", "100ms").Should(BeTrue())
 	})
 
 	createNamespace := func(name string, labels map[string]string, annotations map[string]string) *corev1.Namespace {
@@ -92,10 +114,8 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	}
 
 	createCR := func(name, namespace string, labels map[string]string, finalizers []string, spec labelsv1alpha1.NamespaceLabelSpec) *labelsv1alpha1.NamespaceLabel {
-		// Upsert semantics: if exists, update it to ensure correct spec per test
 		var existing labelsv1alpha1.NamespaceLabel
-		err := testClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &existing)
-		if err == nil {
+		if err := testClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &existing); err == nil {
 			existing.Labels = labels
 			existing.Finalizers = finalizers
 			existing.Spec = spec
@@ -328,8 +348,10 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				},
 			})
 
-			cr.Status.AppliedLabels = map[string]string{"old-label": "old-value"}
-			Expect(testClient.Status().Update(ctx, cr)).To(Succeed())
+			var freshCR labelsv1alpha1.NamespaceLabel
+			Expect(testClient.Get(ctx, client.ObjectKeyFromObject(cr), &freshCR)).To(Succeed())
+			freshCR.Status.AppliedLabels = map[string]string{"old-label": "old-value"}
+			Expect(testClient.Status().Update(ctx, &freshCR)).To(Succeed())
 
 			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
 
@@ -361,8 +383,11 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 				cr := createCR("test-cr", crNamespace, nil, []string{FinalizerName}, labelsv1alpha1.NamespaceLabelSpec{})
 
 				if appliedLabels != nil {
-					cr.Status.AppliedLabels = appliedLabels
-					Expect(testClient.Status().Update(ctx, cr)).To(Succeed())
+					var freshCR labelsv1alpha1.NamespaceLabel
+					Expect(testClient.Get(ctx, client.ObjectKeyFromObject(cr), &freshCR)).To(Succeed())
+					freshCR.Status.AppliedLabels = appliedLabels
+					Expect(testClient.Status().Update(ctx, &freshCR)).To(Succeed())
+					cr = &freshCR
 				}
 
 				result, err := reconciler.finalize(ctx, cr)
