@@ -67,6 +67,16 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		}
 	})
 
+	AfterEach(func() {
+		existingCM := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ProtectionConfigMapName,
+				Namespace: ProtectionNamespace,
+			},
+		}
+		_ = testClient.Delete(ctx, existingCM)
+	})
+
 	createNamespace := func(name string, labels map[string]string, annotations map[string]string) *corev1.Namespace {
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -120,10 +130,16 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	}
 
 	createProtectionConfigMap := func(patterns []string, mode string) {
-		protectionCM := createProtectionConfigMapObject(patterns, mode)
-		if err := testClient.Create(ctx, protectionCM); err != nil && !apierrors.IsAlreadyExists(err) {
-			Expect(err).NotTo(HaveOccurred())
+		existingCM := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ProtectionConfigMapName,
+				Namespace: ProtectionNamespace,
+			},
 		}
+		_ = testClient.Delete(ctx, existingCM)
+
+		protectionCM := createProtectionConfigMapObject(patterns, mode)
+		Expect(testClient.Create(ctx, protectionCM)).To(Succeed())
 	}
 
 	reconcileRequest := func(name, namespace string) reconcile.Request {
