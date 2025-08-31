@@ -101,7 +101,16 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			},
 			Spec: spec,
 		}
-		if err := testClient.Create(ctx, cr); err != nil && !apierrors.IsAlreadyExists(err) {
+		if err := testClient.Create(ctx, cr); err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				var existing labelsv1alpha1.NamespaceLabel
+				Expect(testClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &existing)).To(Succeed())
+				existing.Labels = labels
+				existing.Finalizers = finalizers
+				existing.Spec = spec
+				Expect(testClient.Update(ctx, &existing)).To(Succeed())
+				return &existing
+			}
 			Expect(err).NotTo(HaveOccurred())
 		}
 		return cr
