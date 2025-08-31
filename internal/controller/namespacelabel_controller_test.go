@@ -92,7 +92,6 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 	}
 
 	createCR := func(name, namespace string, labels map[string]string, finalizers []string, spec labelsv1alpha1.NamespaceLabelSpec) *labelsv1alpha1.NamespaceLabel {
-		// Upsert semantics: if exists, update it to ensure correct spec per test
 		var existing labelsv1alpha1.NamespaceLabel
 		err := testClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &existing)
 		if err == nil {
@@ -150,11 +149,13 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		protectionCM := createProtectionConfigMapObject(patterns, mode)
 		Expect(testClient.Create(ctx, protectionCM)).To(Succeed())
 
-		// Ensure the ConfigMap is readable before proceeding to Reconcile
-		Eventually(func() error {
+		Eventually(func() bool {
 			cm := &corev1.ConfigMap{}
-			return testClient.Get(ctx, client.ObjectKey{Name: ProtectionConfigMapName, Namespace: ProtectionNamespace}, cm)
-		}, "5s", "100ms").Should(Succeed())
+			if err := testClient.Get(ctx, client.ObjectKey{Name: ProtectionConfigMapName, Namespace: ProtectionNamespace}, cm); err != nil {
+				return false
+			}
+			return cm.Data["mode"] == mode
+		}, "5s", "100ms").Should(BeTrue())
 	}
 
 	reconcileRequest := func(name, namespace string) reconcile.Request {

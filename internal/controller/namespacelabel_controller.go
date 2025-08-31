@@ -220,7 +220,8 @@ func (r *NamespaceLabelReconciler) filterProtectedLabels(
 	skipped = []string{}
 
 	for key, value := range desired {
-		if isLabelProtected(key, config.Patterns) {
+		isProtected := isLabelProtected(key, config.Patterns)
+		if isProtected {
 			existingValue, hasExisting := existing[key]
 
 			if hasExisting && existingValue != value {
