@@ -11,6 +11,7 @@ import (
 
 	"github.com/sbahar619/namespace-label-operator/internal/constants"
 	"github.com/sbahar619/namespace-label-operator/internal/factory"
+	"github.com/sbahar619/namespace-label-operator/internal/testutils"
 )
 
 func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, patterns []string, mode string) error {
@@ -27,7 +28,22 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, pat
 		}
 	}
 
-	cm := factory.NewProtectionConfigMap(patterns, mode)
+	patternsYAML, err := testutils.PatternsToYAML(patterns)
+	if err != nil {
+		return err
+	}
+
+	cm := factory.NewConfigMap(factory.ConfigMapOptions{
+		Name:      constants.ProtectionConfigMapName,
+		Namespace: constants.ProtectionNamespace,
+		Data: map[string]string{
+			"patterns": patternsYAML,
+			"mode":     mode,
+		},
+		Labels: map[string]string{
+			"app.kubernetes.io/managed-by": "namespacelabel-operator",
+		},
+	})
 	if err := k8sClient.Create(ctx, cm); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -65,7 +81,9 @@ func CreateNoProtectionConfig(ctx context.Context, k8sClient client.Client) erro
 }
 
 func EnsureProtectionNamespace(ctx context.Context, k8sClient client.Client) error {
-	ns := factory.NewNamespace(constants.ProtectionNamespace, nil, nil)
+	ns := factory.NewNamespace(factory.NamespaceOptions{
+		Name: constants.ProtectionNamespace,
+	})
 	if err := k8sClient.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}

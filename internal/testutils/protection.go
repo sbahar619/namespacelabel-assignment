@@ -15,10 +15,31 @@ import (
 
 func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, patterns []string, mode string) error {
 
-	existingCM := factory.NewProtectionConfigMap(nil, "")
+	existingCM := factory.NewConfigMap(factory.ConfigMapOptions{
+		Name:      constants.ProtectionConfigMapName,
+		Namespace: constants.ProtectionNamespace,
+		Labels: map[string]string{
+			"app.kubernetes.io/managed-by": "namespacelabel-operator",
+		},
+	})
 	_ = k8sClient.Delete(ctx, existingCM)
 
-	cm := factory.NewProtectionConfigMap(patterns, mode)
+	patternsYAML, err := PatternsToYAML(patterns)
+	if err != nil {
+		return err
+	}
+
+	cm := factory.NewConfigMap(factory.ConfigMapOptions{
+		Name:      constants.ProtectionConfigMapName,
+		Namespace: constants.ProtectionNamespace,
+		Data: map[string]string{
+			"patterns": patternsYAML,
+			"mode":     mode,
+		},
+		Labels: map[string]string{
+			"app.kubernetes.io/managed-by": "namespacelabel-operator",
+		},
+	})
 	if err := k8sClient.Create(ctx, cm); err != nil {
 		return err
 	}
@@ -38,7 +59,13 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, pat
 }
 
 func DeleteProtectionConfigMap(ctx context.Context, k8sClient client.Client) error {
-	cm := factory.NewProtectionConfigMap(nil, "")
+	cm := factory.NewConfigMap(factory.ConfigMapOptions{
+		Name:      constants.ProtectionConfigMapName,
+		Namespace: constants.ProtectionNamespace,
+		Labels: map[string]string{
+			"app.kubernetes.io/managed-by": "namespacelabel-operator",
+		},
+	})
 	return k8sClient.Delete(ctx, cm)
 }
 
@@ -47,7 +74,9 @@ func CreateNoProtectionConfig(ctx context.Context, k8sClient client.Client) erro
 }
 
 func EnsureProtectionNamespace(ctx context.Context, k8sClient client.Client) error {
-	ns := factory.NewNamespace(constants.ProtectionNamespace, nil, nil)
+	ns := factory.NewNamespace(factory.NamespaceOptions{
+		Name: constants.ProtectionNamespace,
+	})
 	if err := k8sClient.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}

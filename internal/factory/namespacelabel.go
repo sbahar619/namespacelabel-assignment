@@ -6,41 +6,19 @@ import (
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
 )
 
-func NewNamespaceLabel(name, namespace string, labels map[string]string) *labelsv1alpha1.NamespaceLabel {
+func NewNamespaceLabel(opts NamespaceLabelOptions) *labelsv1alpha1.NamespaceLabel {
+	opts.applyDefaults()
+
 	return &labelsv1alpha1.NamespaceLabel{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        opts.Name,
+			Namespace:   opts.Namespace,
+			Labels:      opts.Labels,
+			Annotations: opts.Annotations,
+			Finalizers:  opts.Finalizers,
 		},
-		Spec: NewNamespaceLabelSpec(labels),
-	}
-}
-
-func NewCRWithFinalizers(name, namespace string, labels map[string]string, finalizers []string) *labelsv1alpha1.NamespaceLabel {
-	return &labelsv1alpha1.NamespaceLabel{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       name,
-			Namespace:  namespace,
-			Finalizers: finalizers,
+		Spec: labelsv1alpha1.NamespaceLabelSpec{
+			Labels: opts.SpecLabels,
 		},
-		Spec: NewNamespaceLabelSpec(labels),
-	}
-}
-
-func NewCRWithMeta(name, namespace string, objectLabels map[string]string, finalizers []string, specLabels map[string]string) *labelsv1alpha1.NamespaceLabel {
-	return &labelsv1alpha1.NamespaceLabel{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       name,
-			Namespace:  namespace,
-			Labels:     objectLabels,
-			Finalizers: finalizers,
-		},
-		Spec: NewNamespaceLabelSpec(specLabels),
-	}
-}
-
-func NewNamespaceLabelSpec(labels map[string]string) labelsv1alpha1.NamespaceLabelSpec {
-	return labelsv1alpha1.NamespaceLabelSpec{
-		Labels: labels,
 	}
 }

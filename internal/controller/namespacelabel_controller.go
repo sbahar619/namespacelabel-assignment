@@ -186,12 +186,12 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*fa
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return factory.NewDefaultProtectionConfig(), nil
+			return factory.NewProtectionConfig(nil, ""), nil
 		}
 		return nil, fmt.Errorf("failed to read protection ConfigMap '%s/%s': %w", constants.ProtectionNamespace, constants.ProtectionConfigMapName, err)
 	}
 
-	config := factory.NewDefaultProtectionConfig()
+	config := factory.NewProtectionConfig(nil, "")
 
 	if patternsData, exists := cm.Data["patterns"]; exists {
 		config.Patterns = parseConfigMapPatterns(patternsData)

@@ -185,7 +185,9 @@ var _ = Describe("Multi-Namespace Tests", Label("multi-namespace"), Serial, func
 			)
 
 			By("Deleting the namespace while CR exists")
-			nsObj := factory.NewNamespace(ns, nil, nil)
+			nsObj := factory.NewNamespace(factory.NamespaceOptions{
+				Name: ns,
+			})
 			Expect(k8sClient.Delete(ctx, nsObj)).To(Succeed())
 
 			By("Verifying namespace is eventually deleted")

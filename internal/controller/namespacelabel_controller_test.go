@@ -59,14 +59,19 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		}
 		ctx = context.TODO()
 
-		protectionNS := factory.NewNamespace(constants.ProtectionNamespace, nil, nil)
+		protectionNS := factory.NewNamespace(factory.NamespaceOptions{
+			Name: constants.ProtectionNamespace,
+		})
 		if err := testClient.Create(ctx, protectionNS); err != nil && !apierrors.IsAlreadyExists(err) {
 			Expect(err).NotTo(HaveOccurred())
 		}
 	})
 
 	AfterEach(func() {
-		existingCM := factory.NewConfigMap(constants.ProtectionConfigMapName, constants.ProtectionNamespace, nil, nil)
+		existingCM := factory.NewConfigMap(factory.ConfigMapOptions{
+			Name:      constants.ProtectionConfigMapName,
+			Namespace: constants.ProtectionNamespace,
+		})
 		_ = testClient.Delete(ctx, existingCM)
 	})
 
@@ -355,15 +360,18 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should handle ConfigMap with comments and extra whitespace", func() {
-			protectionCM := factory.NewConfigMap(
-				constants.ProtectionConfigMapName,
-				constants.ProtectionNamespace,
-				map[string]string{
+			protectionCM := factory.NewConfigMap(factory.ConfigMapOptions{
+				Name:      constants.ProtectionConfigMapName,
+				Namespace: constants.ProtectionNamespace,
+				Data: map[string]string{
 					"patterns": "# This is a comment\n- \"kubernetes.io/*\"\n  \n- \"*.k8s.io/*\"  # inline comment\n\n",
 					"mode":     "  " + constants.ProtectionModeFail + "  ",
 				},
-				nil,
-			)
+				Labels: map[string]string{
+					"app.kubernetes.io/managed-by": "namespacelabel-operator",
+					"test-scenario":                "comments-and-whitespace",
+				},
+			})
 			if err := testClient.Create(ctx, protectionCM); err != nil && !apierrors.IsAlreadyExists(err) {
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -395,7 +403,7 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 		})
 
 		It("should allow all labels when no patterns are defined", func() {
-			emptyConfig := factory.NewDefaultProtectionConfig()
+			emptyConfig := factory.NewProtectionConfig(nil, "")
 
 			desired := map[string]string{
 				"kubernetes.io/managed-by": "test",

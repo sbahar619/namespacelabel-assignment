@@ -24,13 +24,20 @@ func CreateCR(
 	var existing labelsv1alpha1.NamespaceLabel
 	if err := k8sClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &existing); err == nil {
 
-		existing.Spec = factory.NewNamespaceLabelSpec(labels)
+		existing.Spec = labelsv1alpha1.NamespaceLabelSpec{
+			Labels: labels,
+		}
 		existing.Finalizers = finalizers
 		Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
 		return &existing
 	}
 
-	cr := factory.NewCRWithFinalizers(name, namespace, labels, finalizers)
+	cr := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+		Name:       name,
+		Namespace:  namespace,
+		SpecLabels: labels,
+		Finalizers: finalizers,
+	})
 	Expect(k8sClient.Create(ctx, cr)).To(Succeed())
 	return cr
 }
@@ -41,7 +48,11 @@ func CreateSimpleCR(
 	name, namespace string,
 	labels map[string]string,
 ) *labelsv1alpha1.NamespaceLabel {
-	cr := factory.NewNamespaceLabel(name, namespace, labels)
+	cr := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+		Name:       name,
+		Namespace:  namespace,
+		SpecLabels: labels,
+	})
 	Expect(k8sClient.Create(ctx, cr)).To(Succeed())
 	return cr
 }
@@ -54,13 +65,22 @@ func CreateCRWithMeta(
 	finalizers []string,
 	specLabels map[string]string,
 ) *labelsv1alpha1.NamespaceLabel {
-	cr := factory.NewCRWithMeta(name, namespace, objectLabels, finalizers, specLabels)
+	cr := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+		Name:       name,
+		Namespace:  namespace,
+		Labels:     objectLabels,
+		Finalizers: finalizers,
+		SpecLabels: specLabels,
+	})
 	Expect(k8sClient.Create(ctx, cr)).To(Succeed())
 	return cr
 }
 
 func DeleteCR(ctx context.Context, k8sClient client.Client, name, namespace string) error {
-	cr := factory.NewNamespaceLabel(name, namespace, nil)
+	cr := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+		Name:      name,
+		Namespace: namespace,
+	})
 	return k8sClient.Delete(ctx, cr)
 }
 
@@ -118,7 +138,11 @@ func NewNamespaceLabel(opts CROptions, namespace string) *labelsv1alpha1.Namespa
 		name = "labels"
 	}
 
-	return factory.NewNamespaceLabel(name, namespace, opts.Labels)
+	return factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+		Name:       name,
+		Namespace:  namespace,
+		SpecLabels: opts.Labels,
+	})
 }
 
 func CreateCRFromOptions(

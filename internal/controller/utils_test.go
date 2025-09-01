@@ -28,7 +28,10 @@ import (
 var _ = Describe("getAppliedLabels", Label("controller"), func() {
 	DescribeTable("status parsing scenarios",
 		func(appliedLabels map[string]string, expectedResult map[string]string) {
-			cr := factory.NewNamespaceLabel("test", "test-ns", nil)
+			cr := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+				Name:      "test",
+				Namespace: "test-ns",
+			})
 			cr.Status.AppliedLabels = appliedLabels
 			result := getAppliedLabels(cr)
 			Expect(result).To(Equal(expectedResult))
@@ -175,7 +178,10 @@ var _ = Describe("isLabelProtected", func() {
 
 var _ = Describe("updateStatus", func() {
 	It("should update status fields correctly for success", func() {
-		cr := factory.NewNamespaceLabel("test", "test-ns", nil)
+		cr := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+			Name:      "test",
+			Namespace: "test-ns",
+		})
 
 		updateStatus(cr, true, "Synced", "Labels applied successfully")
 
@@ -190,7 +196,10 @@ var _ = Describe("updateStatus", func() {
 	})
 
 	It("should update status fields correctly for failure", func() {
-		cr := factory.NewNamespaceLabel("test", "test-ns", nil)
+		cr := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+			Name:      "test",
+			Namespace: "test-ns",
+		})
 
 		updateStatus(cr, false, "InvalidName", "CR must be named 'labels'")
 

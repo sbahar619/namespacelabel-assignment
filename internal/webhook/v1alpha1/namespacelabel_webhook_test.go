@@ -49,7 +49,11 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 				fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 				validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-				obj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
+				obj := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+					Name:       "labels",
+					Namespace:  "test-ns",
+					SpecLabels: map[string]string{"env": "test"},
+				})
 
 				warnings, err := validator.ValidateCreate(ctx, obj)
 				Expect(err).NotTo(HaveOccurred())
@@ -60,7 +64,11 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 				fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 				validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-				obj := factory.NewNamespaceLabel("invalid-name", "test-ns", map[string]string{"env": "test"})
+				obj := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+					Name:       "invalid-name",
+					Namespace:  "test-ns",
+					SpecLabels: map[string]string{"env": "test"},
+				})
 
 				warnings, err := validator.ValidateCreate(ctx, obj)
 				Expect(err).To(HaveOccurred())
@@ -74,7 +82,11 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 				fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 				validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-				obj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
+				obj := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+					Name:       "labels",
+					Namespace:  "test-ns",
+					SpecLabels: map[string]string{"env": "test"},
+				})
 
 				warnings, err := validator.ValidateCreate(ctx, obj)
 				Expect(err).NotTo(HaveOccurred())
@@ -82,7 +94,11 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 			})
 
 			It("should reject creation when another NamespaceLabel already exists", func() {
-				existing := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"existing": "label"})
+				existing := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+					Name:       "labels",
+					Namespace:  "test-ns",
+					SpecLabels: map[string]string{"existing": "label"},
+				})
 
 				fakeClient := fake.NewClientBuilder().
 					WithScheme(scheme).
@@ -90,7 +106,11 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 					Build()
 				validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-				obj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
+				obj := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+					Name:       "labels",
+					Namespace:  "test-ns",
+					SpecLabels: map[string]string{"env": "test"},
+				})
 
 				warnings, err := validator.ValidateCreate(ctx, obj)
 				Expect(err).To(HaveOccurred())
@@ -102,7 +122,11 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 
 	Describe("ValidateUpdate", func() {
 		It("should allow valid updates", func() {
-			existing := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
+			existing := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+				Name:       "labels",
+				Namespace:  "test-ns",
+				SpecLabels: map[string]string{"env": "test"},
+			})
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
@@ -110,9 +134,13 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 				Build()
 			validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-			newObj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{
-				"env":  "production",
-				"tier": "backend",
+			newObj := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+				Name:      "labels",
+				Namespace: "test-ns",
+				SpecLabels: map[string]string{
+					"env":  "production",
+					"tier": "backend",
+				},
 			})
 
 			warnings, err := validator.ValidateUpdate(ctx, existing, newObj)
@@ -124,9 +152,17 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-			oldObj := factory.NewNamespaceLabel("labels", "test-ns", map[string]string{"env": "test"})
+			oldObj := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+				Name:       "labels",
+				Namespace:  "test-ns",
+				SpecLabels: map[string]string{"env": "test"},
+			})
 
-			newObj := factory.NewNamespaceLabel("different-name", "test-ns", map[string]string{"env": "test"})
+			newObj := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+				Name:       "different-name",
+				Namespace:  "test-ns",
+				SpecLabels: map[string]string{"env": "test"},
+			})
 
 			warnings, err := validator.ValidateUpdate(ctx, oldObj, newObj)
 			Expect(err).To(HaveOccurred())
@@ -140,7 +176,10 @@ var _ = Describe("NamespaceLabel Webhook", Label("webhook"), func() {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			validator = &NamespaceLabelCustomValidator{Client: fakeClient}
 
-			obj := factory.NewNamespaceLabel("labels", "test-ns", nil)
+			obj := factory.NewNamespaceLabel(factory.NamespaceLabelOptions{
+				Name:      "labels",
+				Namespace: "test-ns",
+			})
 
 			warnings, err := validator.ValidateDelete(ctx, obj)
 			Expect(err).NotTo(HaveOccurred())

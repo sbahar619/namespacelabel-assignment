@@ -5,24 +5,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewNamespace(name string, labels, annotations map[string]string) *corev1.Namespace {
+func NewNamespace(opts NamespaceOptions) *corev1.Namespace {
+	opts.applyDefaults()
+
 	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Labels:      labels,
-			Annotations: annotations,
+			Name:        opts.Name,
+			Labels:      opts.Labels,
+			Annotations: opts.Annotations,
 		},
 	}
-}
-
-func NewTestNamespace(name string, labels map[string]string) *corev1.Namespace {
-	testLabels := map[string]string{
-		"app.kubernetes.io/managed-by": "namespacelabel-test",
-	}
-
-	for k, v := range labels {
-		testLabels[k] = v
-	}
-
-	return NewNamespace(name, testLabels, nil)
 }

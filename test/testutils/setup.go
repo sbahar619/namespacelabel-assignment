@@ -22,7 +22,9 @@ import (
 var GlobalTestClient client.Client
 
 func DeleteTestNamespace(ctx context.Context, k8sClient client.Client, name string) {
-	ns := factory.NewNamespace(name, nil, nil)
+	ns := factory.NewNamespace(factory.NamespaceOptions{
+		Name: name,
+	})
 	_ = k8sClient.Delete(ctx, ns)
 }
 

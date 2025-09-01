@@ -26,7 +26,11 @@ func CreateNamespace(
 		return &existing
 	}
 
-	ns := factory.NewNamespace(name, labels, annotations)
+	ns := factory.NewNamespace(factory.NamespaceOptions{
+		Name:        name,
+		Labels:      labels,
+		Annotations: annotations,
+	})
 	Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 	return ns
 }
@@ -37,13 +41,30 @@ func CreateTestNamespace(
 	name string,
 	labels map[string]string,
 ) *corev1.Namespace {
-	ns := factory.NewTestNamespace(name, labels)
+	testLabels := map[string]string{
+		"app.kubernetes.io/managed-by": "namespacelabel-test",
+	}
+
+	allLabels := make(map[string]string)
+	for k, v := range testLabels {
+		allLabels[k] = v
+	}
+	for k, v := range labels {
+		allLabels[k] = v
+	}
+
+	ns := factory.NewNamespace(factory.NamespaceOptions{
+		Name:   name,
+		Labels: allLabels,
+	})
 	Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 	return ns
 }
 
 func DeleteNamespace(ctx context.Context, k8sClient client.Client, name string) error {
-	ns := factory.NewNamespace(name, nil, nil)
+	ns := factory.NewNamespace(factory.NamespaceOptions{
+		Name: name,
+	})
 	return k8sClient.Delete(ctx, ns)
 }
 
@@ -53,7 +74,11 @@ func EnsureNamespaceExists(
 	name string,
 	labels, annotations map[string]string,
 ) *corev1.Namespace {
-	ns := factory.NewNamespace(name, labels, annotations)
+	ns := factory.NewNamespace(factory.NamespaceOptions{
+		Name:        name,
+		Labels:      labels,
+		Annotations: annotations,
+	})
 	if err := k8sClient.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		Expect(err).NotTo(HaveOccurred())
 	}
