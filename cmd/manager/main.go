@@ -131,8 +131,9 @@ func main() {
 
 	// Setup controller
 	if err = (&controller.NamespaceLabelReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("namespacelabel-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NamespaceLabel")
 		os.Exit(1)

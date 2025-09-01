@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -54,8 +55,9 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 
 		testClient = k8sClient
 		reconciler = &NamespaceLabelReconciler{
-			Client: testClient,
-			Scheme: scheme,
+			Client:   testClient,
+			Scheme:   scheme,
+			Recorder: record.NewFakeRecorder(100),
 		}
 		ctx = context.TODO()
 
@@ -251,6 +253,44 @@ var _ = Describe("NamespaceLabelReconciler", Label("controller"), func() {
 			Expect(testClient.Get(ctx, client.ObjectKeyFromObject(cr), &updatedCR)).To(Succeed())
 			Expect(updatedCR.Status.AppliedLabels).To(HaveKeyWithValue("new-label", "new-value"))
 			Expect(updatedCR.Status.AppliedLabels).NotTo(HaveKey("old-label"))
+		})
+
+		It("should detect and restore manually modified labels", func() {
+			By("Setting up protection config")
+			Expect(testutils.CreateProtectionConfigMap(ctx, testClient, []string{"kubernetes.io/*", "*.k8s.io/*"}, constants.ProtectionModeSkip)).To(Succeed())
+
+			By("Setting up namespace and NamespaceLabel resource")
+			testutils.CreateNamespace(ctx, testClient, "test-ns", nil, nil)
+			testutils.CreateCR(ctx, testClient, "labels", "test-ns", map[string]string{
+				"environment": "production",
+				"team":        "platform",
+			}, []string{constants.FinalizerName})
+
+			By("Reconciling to apply initial labels")
+			result, err := reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+
+			By("Verifying labels were applied")
+			var ns corev1.Namespace
+			Expect(testClient.Get(ctx, types.NamespacedName{Name: "test-ns"}, &ns)).To(Succeed())
+			Expect(ns.Labels).To(HaveKeyWithValue("environment", "production"))
+			Expect(ns.Labels).To(HaveKeyWithValue("team", "platform"))
+
+			By("Manually modifying namespace labels (simulating admin edit)")
+			delete(ns.Labels, "environment")
+			ns.Labels["team"] = "modified-by-admin"
+			Expect(testClient.Update(ctx, &ns)).To(Succeed())
+
+			By("Reconciling again to detect and restore drift")
+			result, err = reconciler.Reconcile(ctx, reconcileRequest("labels", "test-ns"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+
+			By("Verifying labels were restored to desired state")
+			Expect(testClient.Get(ctx, types.NamespacedName{Name: "test-ns"}, &ns)).To(Succeed())
+			Expect(ns.Labels).To(HaveKeyWithValue("environment", "production"))
+			Expect(ns.Labels).To(HaveKeyWithValue("team", "platform"))
 		})
 	})
 

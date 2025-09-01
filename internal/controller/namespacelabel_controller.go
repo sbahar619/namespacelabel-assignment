@@ -15,7 +15,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // +kubebuilder:rbac:groups=labels.shahaf.com,resources=namespacelabels,verbs=get;list;watch;create;update;patch;delete
@@ -27,7 +29,26 @@ import (
 func (r *NamespaceLabelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&labelsv1alpha1.NamespaceLabel{}).
+		Watches(&corev1.Namespace{}, handler.EnqueueRequestsFromMapFunc(r.mapNamespaceToRequests)).
 		Complete(r)
+}
+
+// mapNamespaceToRequests finds NamespaceLabel CRs that target a namespace
+func (r *NamespaceLabelReconciler) mapNamespaceToRequests(ctx context.Context, obj client.Object) []reconcile.Request {
+	// Find NamespaceLabel CRs that target this namespace
+	var namespaceLabelList labelsv1alpha1.NamespaceLabelList
+	err := r.List(ctx, &namespaceLabelList, client.InNamespace(obj.GetName()))
+	if err != nil {
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, cr := range namespaceLabelList.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(&cr),
+		})
+	}
+	return requests
 }
 
 func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -81,6 +102,12 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			l.Error(statusErr, "failed to update status for protection error")
 		}
 		return ctrl.Result{RequeueAfter: time.Minute * 5}, err
+	}
+
+	// Check for drift: labels we applied that are now missing/changed
+	if exists && r.detectDrift(ns.Labels, prevApplied, allowedLabels) {
+		r.Recorder.Event(&current, corev1.EventTypeWarning, "DriftDetected",
+			"Namespace labels were manually modified, restoring to desired state")
 	}
 
 	changed := r.applyLabelsToNamespace(ns, allowedLabels, prevApplied)
@@ -173,6 +200,24 @@ func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, 
 	changed := removeStaleLabels(ns.Labels, desired, prevApplied)
 	changed = applyDesiredLabels(ns.Labels, desired) || changed
 	return changed
+}
+
+// detectDrift checks if labels we applied were manually modified
+func (r *NamespaceLabelReconciler) detectDrift(currentLabels, prevApplied, desiredLabels map[string]string) bool {
+	if currentLabels == nil {
+		currentLabels = map[string]string{}
+	}
+
+	// Check for drift: labels we applied that are now missing/changed
+	for key, appliedValue := range prevApplied {
+		// Only check drift if the label is still desired
+		if _, stillDesired := desiredLabels[key]; stillDesired {
+			if currentValue, exists := currentLabels[key]; !exists || currentValue != appliedValue {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*factory.ProtectionConfig, error) {
