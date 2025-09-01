@@ -2,7 +2,7 @@ name: Test
 
 on:
   pull_request:
-    branches: [ main, develop, namespacelabel-operator ]
+    branches: [ main, develop, namespacelabel-operator, use-cert-manager ]
     paths-ignore:
       - '**.md'
       - 'docs/**'
