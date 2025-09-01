@@ -4,19 +4,20 @@ Kubernetes operator for managing namespace labels with protection patterns.
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+```bash
+make cert-manager-install
+```
+
 ### Install & Deploy
 
 ```bash
-# Quick install from releases (certificates auto-generated)
-kubectl apply -f https://github.com/dana-team/namespacelabel/releases/latest/download/install.yaml
-./hack/generate-webhook-certs.sh
-
-# Or deploy with default images
 make deploy
-
-# Or deploy with custom image
 make deploy MANAGER_IMG=your-registry/namespacelabel-manager:tag
 ```
+
+**No manual certificate steps required!** cert-manager handles all webhook certificates automatically.
 
 ### Create a NamespaceLabel
 ```bash

@@ -102,17 +102,25 @@ docker-push: ## Push docker image with the manager.
 .PHONY: generate-installer
 generate-installer: manifests kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
-	@echo "🏗️ Setting image references for installer..."
 	@cd config/manager && $(KUSTOMIZE) edit set image manager=${MANAGER_IMG}
-	@echo "📦 Building complete installer..."
 	$(KUSTOMIZE) build config/default > dist/install.yaml
-	@echo "✅ Complete installer generated at dist/install.yaml"
 
 ##@ Deployment
 
 ifndef ignore-not-found
   ignore-not-found = true
 endif
+
+.PHONY: cert-manager-install
+cert-manager-install: ## Install cert-manager (required for webhook certificates)
+	@kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+	@kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s
+	@kubectl wait --for=condition=Available deployment/cert-manager-cainjector -n cert-manager --timeout=300s
+	@kubectl wait --for=condition=Available deployment/cert-manager-webhook -n cert-manager --timeout=300s
+
+.PHONY: cert-manager-uninstall
+cert-manager-uninstall: ## Uninstall cert-manager from the K8s cluster
+	@kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml --ignore-not-found=true
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
@@ -124,19 +132,14 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy the complete operator (controller and webhook) to the K8s cluster.
-	@echo "🏗️ Setting image references..."
 	@cd config/manager && $(KUSTOMIZE) edit set image manager=${MANAGER_IMG}
-	@echo "🚀 Deploying to cluster..."
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
-	@echo "🔐 Generating webhook certificates..."
-	@./hack/generate-webhook-certs.sh
+	@kubectl wait --for=condition=Ready certificate/namespacelabel-webhook-serving-cert -n namespacelabel-system --timeout=300s || echo "⚠️  Certificate may still be provisioning"
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy the complete operator from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
-	@echo "🔄 Resetting image references to defaults..."
 	@cd config/manager && $(KUSTOMIZE) edit set image manager=manager:latest
-	@echo "✅ Image references reset successfully"
 
 ##@ Monitoring
 

@@ -67,12 +67,16 @@ jobs:
         kind load docker-image manager:latest --name namespacelabel-e2e
         echo "✅ Image loaded to kind cluster"
 
+    - name: Install cert-manager
+      run: |
+        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+        kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s
+        kubectl wait --for=condition=Available deployment/cert-manager-cainjector -n cert-manager --timeout=300s
+        kubectl wait --for=condition=Available deployment/cert-manager-webhook -n cert-manager --timeout=300s
+
     - name: Deploy to cluster
       run: |
-        # Deploy unified manager with correct image reference
         make deploy MANAGER_IMG=manager:latest
-
-        # Patch manager deployment for local images - patch both manager and kube-rbac-proxy containers
         kubectl patch deployment namespacelabel-controller-manager -n namespacelabel-system --type=json --patch '[
           {
             "op": "replace",
@@ -80,14 +84,8 @@ jobs:
             "value": "IfNotPresent"
           }
         ]'
-        
-        # Wait for deployment to be ready
-        echo "Waiting for deployment to be ready..."
+        kubectl wait --for=condition=Ready certificate/namespacelabel-webhook-serving-cert -n namespacelabel-system --timeout=300s
         kubectl wait --for=condition=Available deployment/namespacelabel-controller-manager -n namespacelabel-system --timeout=600s
-        
-        # Verify deployment success
-        echo "✅ Deployment ready. Final verification:"
-        kubectl get deployments,pods -n namespacelabel-system -o wide
 
     - name: Run E2E tests
       run: make test-e2e
@@ -96,18 +94,12 @@ jobs:
     - name: Debug on failure
       if: failure()
       run: |
-        echo "=== 🔍 Debug Information ==="
-        
-        echo "📋 Cluster Resources:"
-        kubectl get deployments,pods,events -n namespacelabel-system -o wide || true
-        
-        echo "📝 Pod Details:"
+        kubectl get deployments,pods,events,certificates,secrets -n namespacelabel-system -o wide || true
         kubectl describe pods -n namespacelabel-system || true
-        
-        echo "📄 Manager Logs:"
         kubectl logs deployment/namespacelabel-controller-manager -n namespacelabel-system --all-containers=true --tail=100 || true
-        
-        echo "🐳 Docker Images (for debugging):"
+        kubectl describe certificate namespacelabel-webhook-serving-cert -n namespacelabel-system || true
+        kubectl get pods -n cert-manager || true
+        kubectl logs -n cert-manager deployment/cert-manager --tail=50 || true
         docker images | grep -E "(manager)" || true
 
     - name: Cleanup kind cluster
