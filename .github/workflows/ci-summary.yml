@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["E2E Tests"]
     types: [completed]
-    branches: [main, develop, namespacelabel-operator]
+    branches: [main, develop, namespacelabel-operator, protect-on-manual-changes]
   workflow_dispatch:  # Allow manual triggering for testing
 
 jobs:
