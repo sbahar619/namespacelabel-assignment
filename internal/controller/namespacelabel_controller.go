@@ -42,7 +42,7 @@ func (r *NamespaceLabelReconciler) mapNamespaceToRequests(ctx context.Context, o
 		return nil
 	}
 
-	var requests []reconcile.Request
+	requests := make([]reconcile.Request, 0, len(namespaceLabelList.Items))
 	for _, cr := range namespaceLabelList.Items {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(&cr),
