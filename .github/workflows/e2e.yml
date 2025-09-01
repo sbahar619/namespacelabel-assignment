@@ -4,16 +4,9 @@ on:
   workflow_run:
     workflows: ["Test"]
     types: [completed]
-    branches: [main, develop, consolidate-controller-and-webhook]  # Only run E2E for main/develop/remove-ns-annotations branches
+    branches: [main, develop, consolidate-controller-and-webhook, namespacelabel-operator]  # Only run E2E after Test succeeds
   push:
-    branches: [main, develop, consolidate-controller-and-webhook]  # Direct pushes to main/develop/remove-ns-annotations (no PR)
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
-  pull_request:  # Run E2E tests on PRs
-    types: [opened, synchronize, reopened]
+    branches: [main, develop, consolidate-controller-and-webhook]  # Direct pushes to main/develop/consolidate-controller-and-webhook (no PR)
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -30,12 +23,11 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    # Only run if Test workflow succeeded or this is a manual/scheduled/PR run
+    # Only run if Test workflow succeeded or this is a manual/scheduled/push run
     if: |
       github.event_name == 'workflow_dispatch' || 
       github.event_name == 'schedule' ||
       github.event_name == 'push' ||
-      github.event_name == 'pull_request' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
     - name: Checkout code
