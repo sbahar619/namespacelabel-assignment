@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/sbahar619/namespace-label-operator/internal/controller"
+	"github.com/sbahar619/namespace-label-operator/internal/constants"
 	"github.com/sbahar619/namespace-label-operator/internal/factory"
 )
 
@@ -26,8 +26,8 @@ func CreateProtectionConfigMap(ctx context.Context, k8sClient client.Client, pat
 	Eventually(func() bool {
 		var checkCM corev1.ConfigMap
 		if err := k8sClient.Get(ctx, client.ObjectKey{
-			Name:      controller.ProtectionConfigMapName,
-			Namespace: controller.ProtectionNamespace,
+			Name:      constants.ProtectionConfigMapName,
+			Namespace: constants.ProtectionNamespace,
 		}, &checkCM); err != nil {
 			return false
 		}
@@ -43,11 +43,11 @@ func DeleteProtectionConfigMap(ctx context.Context, k8sClient client.Client) err
 }
 
 func CreateNoProtectionConfig(ctx context.Context, k8sClient client.Client) error {
-	return CreateProtectionConfigMap(ctx, k8sClient, []string{}, controller.ProtectionModeSkip)
+	return CreateProtectionConfigMap(ctx, k8sClient, []string{}, constants.ProtectionModeSkip)
 }
 
 func EnsureProtectionNamespace(ctx context.Context, k8sClient client.Client) error {
-	ns := factory.NewNamespace(controller.ProtectionNamespace, nil, nil)
+	ns := factory.NewNamespace(constants.ProtectionNamespace, nil, nil)
 	if err := k8sClient.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -57,8 +57,8 @@ func EnsureProtectionNamespace(ctx context.Context, k8sClient client.Client) err
 func GetProtectionConfigMap(ctx context.Context, k8sClient client.Client) (*corev1.ConfigMap, error) {
 	var cm corev1.ConfigMap
 	err := k8sClient.Get(ctx, types.NamespacedName{
-		Name:      controller.ProtectionConfigMapName,
-		Namespace: controller.ProtectionNamespace,
+		Name:      constants.ProtectionConfigMapName,
+		Namespace: constants.ProtectionNamespace,
 	}, &cm)
 	return &cm, err
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
+	"github.com/sbahar619/namespace-label-operator/internal/constants"
 	"github.com/sbahar619/namespace-label-operator/internal/factory"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,8 +45,8 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if exists {
-		if !controllerutil.ContainsFinalizer(&current, FinalizerName) {
-			controllerutil.AddFinalizer(&current, FinalizerName)
+		if !controllerutil.ContainsFinalizer(&current, constants.FinalizerName) {
+			controllerutil.AddFinalizer(&current, constants.FinalizerName)
 			if err := r.Update(ctx, &current); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -126,7 +127,7 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 			if statusErr := r.Status().Update(ctx, cr); statusErr != nil {
 				l.Error(statusErr, "failed to clear applied labels in status")
 			}
-			controllerutil.RemoveFinalizer(cr, FinalizerName)
+			controllerutil.RemoveFinalizer(cr, constants.FinalizerName)
 			return ctrl.Result{}, r.Update(ctx, cr)
 		}
 		return ctrl.Result{}, err
@@ -150,8 +151,8 @@ func (r *NamespaceLabelReconciler) finalize(ctx context.Context, cr *labelsv1alp
 	if statusErr := r.Status().Update(ctx, &freshCR); statusErr != nil {
 		l.Error(statusErr, "failed to clear applied labels in status")
 	}
-	controllerutil.RemoveFinalizer(&freshCR, FinalizerName)
-	controllerutil.RemoveFinalizer(cr, FinalizerName)
+	controllerutil.RemoveFinalizer(&freshCR, constants.FinalizerName)
+	controllerutil.RemoveFinalizer(cr, constants.FinalizerName)
 
 	return ctrl.Result{}, r.Update(ctx, &freshCR)
 }
@@ -179,15 +180,15 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*fa
 
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{
-		Name:      ProtectionConfigMapName,
-		Namespace: ProtectionNamespace,
+		Name:      constants.ProtectionConfigMapName,
+		Namespace: constants.ProtectionNamespace,
 	}, cm)
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return factory.NewDefaultProtectionConfig(), nil
 		}
-		return nil, fmt.Errorf("failed to read protection ConfigMap '%s/%s': %w", ProtectionNamespace, ProtectionConfigMapName, err)
+		return nil, fmt.Errorf("failed to read protection ConfigMap '%s/%s': %w", constants.ProtectionNamespace, constants.ProtectionConfigMapName, err)
 	}
 
 	config := factory.NewDefaultProtectionConfig()
@@ -199,14 +200,14 @@ func (r *NamespaceLabelReconciler) getProtectionConfig(ctx context.Context) (*fa
 	if mode, exists := cm.Data["mode"]; exists {
 		config.Mode = strings.TrimSpace(mode)
 
-		if config.Mode != ProtectionModeSkip && config.Mode != ProtectionModeFail {
+		if config.Mode != constants.ProtectionModeSkip && config.Mode != constants.ProtectionModeFail {
 			l.Info("Invalid protection mode detected, defaulting to 'skip'",
 				"configuredMode", config.Mode,
-				"validModes", []string{ProtectionModeSkip, ProtectionModeFail},
-				"defaultMode", ProtectionModeSkip,
-				"configMap", ProtectionConfigMapName,
-				"namespace", ProtectionNamespace)
-			config.Mode = ProtectionModeSkip
+				"validModes", []string{constants.ProtectionModeSkip, constants.ProtectionModeFail},
+				"defaultMode", constants.ProtectionModeSkip,
+				"configMap", constants.ProtectionConfigMapName,
+				"namespace", constants.ProtectionNamespace)
+			config.Mode = constants.ProtectionModeSkip
 		}
 	}
 
@@ -228,7 +229,7 @@ func (r *NamespaceLabelReconciler) filterProtectedLabels(
 
 			if hasExisting && existingValue != value {
 				switch config.Mode {
-				case ProtectionModeFail:
+				case constants.ProtectionModeFail:
 					return nil, nil, fmt.Errorf("protected label '%s' cannot be modified (existing: '%s', attempted: '%s')",
 						key, existingValue, value)
 				default:
