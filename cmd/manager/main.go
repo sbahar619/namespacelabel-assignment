@@ -32,9 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	labelsv1alpha1 "github.com/sbahar619/namespace-label-operator/api/v1alpha1"
 	"github.com/sbahar619/namespace-label-operator/internal/controller"
+	webhookv1alpha1 "github.com/sbahar619/namespace-label-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -56,6 +58,8 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var webhookPort int
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -65,6 +69,8 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port the webhook server serves at.")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -89,6 +95,12 @@ func main() {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
+	// Configure webhook server
+	webhookServer := webhook.NewServer(webhook.Options{
+		Port:    webhookPort,
+		TLSOpts: tlsOpts,
+	})
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -96,6 +108,7 @@ func main() {
 			SecureServing: secureMetrics,
 			TLSOpts:       tlsOpts,
 		},
+		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "88bf519b.shahaf.com",
@@ -116,11 +129,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Setup controller
 	if err = (&controller.NamespaceLabelReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NamespaceLabel")
+		os.Exit(1)
+	}
+
+	// Setup webhook
+	if err := webhookv1alpha1.SetupNamespaceLabelWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "NamespaceLabel")
 		os.Exit(1)
 	}
 
@@ -135,7 +155,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	setupLog.Info("starting manager with controller and webhook")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

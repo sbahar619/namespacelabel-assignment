@@ -2,14 +2,10 @@ resources:
 - ../default
 
 images:
-- name: controller
-  newName: controller
-  newTag: latest
-- name: webhook
-  newName: webhook
+- name: manager
+  newName: manager
   newTag: latest
 
 # Set the manager image in the controller deployment
 patchesStrategicMerge:
-- manager_image_patch.yaml
-- webhook_image_patch.yaml 
+- manager_image_patch.yaml 

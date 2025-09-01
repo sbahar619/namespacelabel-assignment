@@ -1,13 +1,12 @@
 # Image URL to use for building/pushing image targets
-CONTROLLER_IMG ?= controller:latest
-WEBHOOK_IMG ?= webhook:latest
+MANAGER_IMG ?= manager:latest
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary
 ENVTEST_K8S_VERSION = 1.29.0
 
-# Controller deployment configuration
-CONTROLLER_NAMESPACE ?= namespacelabel-system
-CONTROLLER_DEPLOYMENT ?= namespacelabel-controller-manager
+# Manager deployment configuration
+MANAGER_NAMESPACE ?= namespacelabel-system
+MANAGER_DEPLOYMENT ?= namespacelabel-controller-manager
 DEPLOYMENT_TIMEOUT ?= 300s
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -84,36 +83,27 @@ test-e2e-debug: ## Run E2E tests sequentially for debugging. Use GINKGO_FOCUS=la
 
 .PHONY: build
 build: generate ## Build manager binary.
-	go build -o bin/manager cmd/controller/main.go
+	go build -o bin/manager cmd/manager/main.go
 
 .PHONY: run
-run: generate ## Run a controller from your host.
-	go run ./cmd/controller/main.go
+run: generate ## Run the manager (controller + webhook) from your host.
+	go run ./cmd/manager/main.go
 
 ##@ Build
 
-.PHONY: controller-docker-build
-controller-docker-build: ## Build docker image with the controller.
-	$(CONTAINER_TOOL) build -t ${CONTROLLER_IMG} -f cmd/controller/Dockerfile .
+.PHONY: docker-build
+docker-build: ## Build docker image with the manager (controller + webhook).
+	$(CONTAINER_TOOL) build -t ${MANAGER_IMG} -f cmd/manager/Dockerfile .
 
-.PHONY: controller-docker-push
-controller-docker-push: ## Push docker image with the controller.
-	$(CONTAINER_TOOL) push ${CONTROLLER_IMG}
-
-.PHONY: webhook-docker-build
-webhook-docker-build: ## Build docker image with the webhook.
-	$(CONTAINER_TOOL) build -t ${WEBHOOK_IMG} -f cmd/webhook/Dockerfile .
-
-.PHONY: webhook-docker-push
-webhook-docker-push: ## Push docker image with the webhook.
-	$(CONTAINER_TOOL) push ${WEBHOOK_IMG}
+.PHONY: docker-push
+docker-push: ## Push docker image with the manager.
+	$(CONTAINER_TOOL) push ${MANAGER_IMG}
 
 .PHONY: generate-installer
 generate-installer: manifests kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
 	@echo "🏗️ Setting image references for installer..."
-	@cd config/manager && $(KUSTOMIZE) edit set image controller=${CONTROLLER_IMG}
-	@cd config/webhook && $(KUSTOMIZE) edit set image webhook=${WEBHOOK_IMG}
+	@cd config/manager && $(KUSTOMIZE) edit set image manager=${MANAGER_IMG}
 	@echo "📦 Building complete installer..."
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 	@echo "✅ Complete installer generated at dist/install.yaml"
@@ -135,8 +125,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy the complete operator (controller and webhook) to the K8s cluster.
 	@echo "🏗️ Setting image references..."
-	@cd config/manager && $(KUSTOMIZE) edit set image controller=${CONTROLLER_IMG}
-	@cd config/webhook && $(KUSTOMIZE) edit set image webhook=${WEBHOOK_IMG}
+	@cd config/manager && $(KUSTOMIZE) edit set image manager=${MANAGER_IMG}
 	@echo "🚀 Deploying to cluster..."
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 	@echo "🔐 Generating webhook certificates..."
@@ -146,27 +135,23 @@ deploy: manifests kustomize ## Deploy the complete operator (controller and webh
 undeploy: kustomize ## Undeploy the complete operator from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 	@echo "🔄 Resetting image references to defaults..."
-	@cd config/manager && $(KUSTOMIZE) edit set image controller=controller:main
-	@cd config/webhook && $(KUSTOMIZE) edit set image webhook=webhook:main
+	@cd config/manager && $(KUSTOMIZE) edit set image manager=manager:latest
 	@echo "✅ Image references reset successfully"
 
 ##@ Monitoring
 
 .PHONY: deploy-status
 deploy-status: ## Show detailed deployment status.
-	@echo "📊 Deployment Status for $(CONTROLLER_IMG) and $(WEBHOOK_IMG):"
+	@echo "📊 Deployment Status for $(MANAGER_IMG):"
 	@echo ""
-	@echo "🏗️  Controller Deployment:"
-	@$(KUBECTL) get deployment $(CONTROLLER_DEPLOYMENT) -n $(CONTROLLER_NAMESPACE) -o wide 2>/dev/null || echo "❌ Controller not deployed"
-	@echo ""
-	@echo "🔗 Webhook Deployment:"
-	@$(KUBECTL) get deployment namespacelabel-webhook-server -n $(CONTROLLER_NAMESPACE) -o wide 2>/dev/null || echo "❌ Webhook not deployed"
+	@echo "🏗️  Manager Deployment:"
+	@$(KUBECTL) get deployment $(MANAGER_DEPLOYMENT) -n $(MANAGER_NAMESPACE) -o wide 2>/dev/null || echo "❌ Manager not deployed"
 	@echo ""
 	@echo "🚀 All Pods:"
-	@$(KUBECTL) get pods -n $(CONTROLLER_NAMESPACE) -o wide 2>/dev/null || echo "❌ No pods found"
+	@$(KUBECTL) get pods -n $(MANAGER_NAMESPACE) -o wide 2>/dev/null || echo "❌ No pods found"
 	@echo ""
 	@echo "📋 Recent Events:"
-	@$(KUBECTL) get events -n $(CONTROLLER_NAMESPACE) --sort-by='.lastTimestamp' | tail -10 2>/dev/null || echo "❌ No events found"
+	@$(KUBECTL) get events -n $(MANAGER_NAMESPACE) --sort-by='.lastTimestamp' | tail -10 2>/dev/null || echo "❌ No events found"
 
 ##@ Dependencies
 

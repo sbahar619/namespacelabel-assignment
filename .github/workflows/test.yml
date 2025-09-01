@@ -2,7 +2,7 @@ name: Test
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, consolidate-controller-and-webhook ]
     paths-ignore:
       - '**.md'
       - 'docs/**'

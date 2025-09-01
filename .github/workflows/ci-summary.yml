@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["E2E Tests"]
     types: [completed]
-    branches: [main, develop]
+    branches: [main, develop, consolidate-controller-and-webhook]
   workflow_dispatch:  # Allow manual triggering for testing
 
 jobs:

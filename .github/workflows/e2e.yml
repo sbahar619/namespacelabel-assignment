@@ -4,9 +4,9 @@ on:
   workflow_run:
     workflows: ["Test"]
     types: [completed]
-    branches: [main, develop]  # Only run E2E for main/develop branches
+    branches: [main, develop, consolidate-controller-and-webhook]  # Only run E2E for main/develop/remove-ns-annotations branches
   push:
-    branches: [main, develop]  # Direct pushes to main/develop (no PR)
+    branches: [main, develop, consolidate-controller-and-webhook]  # Direct pushes to main/develop/remove-ns-annotations (no PR)
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -58,40 +58,29 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    # Build images (fast due to Docker layer caching)
-    - name: Build controller image
+    # Build unified manager image (fast due to Docker layer caching)
+    - name: Build manager image
       uses: docker/build-push-action@v6
       with:
         context: .
-        file: ./cmd/controller/Dockerfile
-        tags: controller:latest
+        file: ./cmd/manager/Dockerfile
+        tags: manager:latest
         load: true
-        cache-from: type=gha,scope=controller
-        platforms: linux/amd64
-
-    - name: Build webhook image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: ./cmd/webhook/Dockerfile
-        tags: webhook:latest
-        load: true
-        cache-from: type=gha,scope=webhook
+        cache-from: type=gha,scope=manager
         platforms: linux/amd64
 
     - name: Load images to kind
       run: |
-        echo "Loading images to kind cluster..."
-        kind load docker-image controller:latest --name namespacelabel-e2e
-        kind load docker-image webhook:latest --name namespacelabel-e2e
-        echo "✅ Images loaded to kind cluster"
+        echo "Loading image to kind cluster..."
+        kind load docker-image manager:latest --name namespacelabel-e2e
+        echo "✅ Image loaded to kind cluster"
 
     - name: Deploy to cluster
       run: |
-        # Deploy controller and webhook with correct image references
-        make deploy CONTROLLER_IMG=controller:latest WEBHOOK_IMG=webhook:latest
+        # Deploy unified manager with correct image reference
+        make deploy MANAGER_IMG=manager:latest
 
-        # Patch controller deployment for local images - patch both manager and kube-rbac-proxy containers
+        # Patch manager deployment for local images - patch both manager and kube-rbac-proxy containers
         kubectl patch deployment namespacelabel-controller-manager -n namespacelabel-system --type=json --patch '[
           {
             "op": "replace",
@@ -99,23 +88,13 @@ jobs:
             "value": "IfNotPresent"
           }
         ]'
-
-        # Patch webhook deployment for local images
-        kubectl patch deployment namespacelabel-webhook-server -n namespacelabel-system --type=json --patch '[
-          {
-            "op": "replace",
-            "path": "/spec/template/spec/containers/0/imagePullPolicy",
-            "value": "IfNotPresent"
-          }
-        ]'
         
-        # Wait for deployments to be ready
-        echo "Waiting for deployments to be ready..."
+        # Wait for deployment to be ready
+        echo "Waiting for deployment to be ready..."
         kubectl wait --for=condition=Available deployment/namespacelabel-controller-manager -n namespacelabel-system --timeout=600s
-        kubectl wait --for=condition=Available deployment/namespacelabel-webhook-server -n namespacelabel-system --timeout=300s
         
         # Verify deployment success
-        echo "✅ Deployments ready. Final verification:"
+        echo "✅ Deployment ready. Final verification:"
         kubectl get deployments,pods -n namespacelabel-system -o wide
 
     - name: Run E2E tests
@@ -133,14 +112,11 @@ jobs:
         echo "📝 Pod Details:"
         kubectl describe pods -n namespacelabel-system || true
         
-        echo "📄 Controller Logs:"
+        echo "📄 Manager Logs:"
         kubectl logs deployment/namespacelabel-controller-manager -n namespacelabel-system --all-containers=true --tail=100 || true
         
-        echo "📄 Webhook Logs:"
-        kubectl logs deployment/namespacelabel-webhook-server -n namespacelabel-system --tail=100 || true
-        
         echo "🐳 Docker Images (for debugging):"
-        docker images | grep -E "(controller|webhook)" || true
+        docker images | grep -E "(manager)" || true
 
     - name: Cleanup kind cluster
       if: always()

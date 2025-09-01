@@ -8,4 +8,4 @@ spec:
     spec:
       containers:
       - name: manager
-        image: quay.io/sbahar/namespacelabel-controller:dev-cur-v1 
+        image: manager:latest 
