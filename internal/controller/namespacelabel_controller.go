@@ -33,9 +33,7 @@ func (r *NamespaceLabelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// mapNamespaceToRequests finds NamespaceLabel CRs that target a namespace
 func (r *NamespaceLabelReconciler) mapNamespaceToRequests(ctx context.Context, obj client.Object) []reconcile.Request {
-	// Find NamespaceLabel CRs that target this namespace
 	var namespaceLabelList labelsv1alpha1.NamespaceLabelList
 	err := r.List(ctx, &namespaceLabelList, client.InNamespace(obj.GetName()))
 	if err != nil {
@@ -104,7 +102,6 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: time.Minute * 5}, err
 	}
 
-	// Check for drift: labels we applied that are now missing/changed
 	if exists && r.detectDrift(ns.Labels, prevApplied, allowedLabels) {
 		r.Recorder.Event(&current, corev1.EventTypeWarning, "DriftDetected",
 			"Namespace labels were manually modified, restoring to desired state")
@@ -202,15 +199,12 @@ func (r *NamespaceLabelReconciler) applyLabelsToNamespace(ns *corev1.Namespace, 
 	return changed
 }
 
-// detectDrift checks if labels we applied were manually modified
 func (r *NamespaceLabelReconciler) detectDrift(currentLabels, prevApplied, desiredLabels map[string]string) bool {
 	if currentLabels == nil {
 		currentLabels = map[string]string{}
 	}
 
-	// Check for drift: labels we applied that are now missing/changed
 	for key, appliedValue := range prevApplied {
-		// Only check drift if the label is still desired
 		if _, stillDesired := desiredLabels[key]; stillDesired {
 			if currentValue, exists := currentLabels[key]; !exists || currentValue != appliedValue {
 				return true
