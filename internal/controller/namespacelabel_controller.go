@@ -25,6 +25,7 @@ import (
 // +kubebuilder:rbac:groups=labels.shahaf.com,resources=namespacelabels/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 func (r *NamespaceLabelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -50,8 +51,6 @@ func (r *NamespaceLabelReconciler) mapNamespaceToRequests(ctx context.Context, o
 }
 
 func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	l := log.FromContext(ctx)
-
 	var current labelsv1alpha1.NamespaceLabel
 	err := r.Get(ctx, req.NamespacedName, &current)
 	exists := err == nil
@@ -73,15 +72,19 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	targetNS := req.Namespace
+	return r.HandleCreateOrUpdate(ctx, &current, req.Namespace)
+}
+
+func (r *NamespaceLabelReconciler) HandleCreateOrUpdate(ctx context.Context, cr *labelsv1alpha1.NamespaceLabel, targetNS string) (ctrl.Result, error) {
+	l := log.FromContext(ctx)
 
 	ns, err := r.getTargetNamespace(ctx, targetNS)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	desired := current.Spec.Labels
-	prevApplied := getAppliedLabels(&current)
+	desired := cr.Spec.Labels
+	prevApplied := getAppliedLabels(cr)
 
 	if ns.Labels == nil {
 		ns.Labels = map[string]string{}
@@ -95,15 +98,16 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	allowedLabels, skippedLabels, err := r.filterProtectedLabels(desired, ns.Labels, protectionConfig)
 	if err != nil {
-		updateStatus(&current, false, "ProtectionError", err.Error())
-		if statusErr := r.Status().Update(ctx, &current); statusErr != nil {
+		updateStatus(cr, false, "ProtectionError", err.Error())
+		if statusErr := r.Status().Update(ctx, cr); statusErr != nil {
 			l.Error(statusErr, "failed to update status for protection error")
 		}
 		return ctrl.Result{RequeueAfter: time.Minute * 5}, err
 	}
 
+	exists := cr.ResourceVersion != ""
 	if exists && r.detectDrift(ns.Labels, prevApplied, allowedLabels) {
-		r.Recorder.Event(&current, corev1.EventTypeWarning, "DriftDetected",
+		r.Recorder.Event(cr, corev1.EventTypeWarning, "DriftDetected",
 			"Namespace labels were manually modified, restoring to desired state")
 	}
 
@@ -129,11 +133,11 @@ func (r *NamespaceLabelReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		l.Info("NamespaceLabel successfully processed",
-			"namespace", current.Namespace, "labelsApplied", appliedCount, "labelsRequested", labelCount, "protectedSkipped", skippedCount)
+			"namespace", cr.Namespace, "labelsApplied", appliedCount, "labelsRequested", labelCount, "protectedSkipped", skippedCount)
 
-		current.Status.AppliedLabels = allowedLabels
-		updateStatus(&current, true, "Synced", message)
-		if err := r.Status().Update(ctx, &current); err != nil {
+		cr.Status.AppliedLabels = allowedLabels
+		updateStatus(cr, true, "Synced", message)
+		if err := r.Status().Update(ctx, cr); err != nil {
 			l.Error(err, "failed to update CR status")
 		}
 	}
