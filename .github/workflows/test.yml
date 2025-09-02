@@ -2,7 +2,7 @@ name: Test
 
 on:
   pull_request:
-    branches: [ main, develop, namespacelabel-operator ]
+    branches: [ main, develop, namespacelabel-operator, refacor-reconcile-srp ]
     paths-ignore:
       - '**.md'
       - 'docs/**'
