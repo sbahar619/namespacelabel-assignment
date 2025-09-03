@@ -36,25 +36,17 @@ func (v *NamespaceLabelCustomValidator) validateName(nl *labelsv1alpha1.Namespac
 
 // validateSingleton ensures only one NamespaceLabel exists per namespace.
 func (v *NamespaceLabelCustomValidator) validateSingleton(ctx context.Context, nl *labelsv1alpha1.NamespaceLabel, oldNL *labelsv1alpha1.NamespaceLabel) error {
-	if oldNL != nil && oldNL.Name == nl.Name && oldNL.Namespace == nl.Namespace {
-		return nil
-	}
 	var existingList labelsv1alpha1.NamespaceLabelList
 	err := v.Client.List(ctx, &existingList, client.InNamespace(nl.Namespace))
 	if err != nil {
 		return fmt.Errorf("failed to check for existing NamespaceLabel resources: %w", err)
 	}
 
-	existingCount := 0
 	for _, existing := range existingList.Items {
 		if oldNL != nil && existing.Name == oldNL.Name {
 			continue
 		}
-		existingCount++
-	}
-
-	if existingCount > 0 {
-		return fmt.Errorf("only one NamespaceLabel resource is allowed per namespace. Found %d existing NamespaceLabel resource(s) in namespace '%s'", existingCount, nl.Namespace)
+		return fmt.Errorf("only one NamespaceLabel resource is allowed per namespace. Found existing resource '%s' in namespace '%s'", existing.Name, nl.Namespace)
 	}
 
 	return nil

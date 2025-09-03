@@ -50,46 +50,40 @@ type NamespaceLabelCustomValidator struct {
 
 var _ webhook.CustomValidator = &NamespaceLabelCustomValidator{}
 
-func (v *NamespaceLabelCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	namespacelabel, ok := obj.(*labelsv1alpha1.NamespaceLabel)
-	if !ok {
-		return nil, fmt.Errorf("expected a NamespaceLabel object but got %T", obj)
-	}
-	namespacelabellog.Info("Validation for NamespaceLabel upon creation", "name", namespacelabel.GetName(), "namespace", namespacelabel.GetNamespace())
+func (v *NamespaceLabelCustomValidator) validateNamespaceLabel(ctx context.Context, nl *labelsv1alpha1.NamespaceLabel, oldNL *labelsv1alpha1.NamespaceLabel, operation string) (admission.Warnings, error) {
+	namespacelabellog.Info("Validation for NamespaceLabel", "operation", operation, "name", nl.GetName(), "namespace", nl.GetNamespace())
 
-	if err := v.validateName(namespacelabel); err != nil {
+	if err := v.validateName(nl); err != nil {
 		return nil, err
 	}
 
-	if err := v.validateSingleton(ctx, namespacelabel, nil); err != nil {
+	if err := v.validateSingleton(ctx, nl, oldNL); err != nil {
 		return nil, err
 	}
 
 	return nil, nil
 }
 
+func (v *NamespaceLabelCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	namespacelabel, ok := obj.(*labelsv1alpha1.NamespaceLabel)
+	if !ok {
+		return nil, fmt.Errorf("expected a NamespaceLabel object but got %T", obj)
+	}
+	return v.validateNamespaceLabel(ctx, namespacelabel, nil, "creation")
+}
+
 func (v *NamespaceLabelCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	namespacelabel, ok := newObj.(*labelsv1alpha1.NamespaceLabel)
 	if !ok {
-		return nil, fmt.Errorf("expected a NamespaceLabel object for the newObj but got %T", newObj)
+		return nil, fmt.Errorf("expected a NamespaceLabel object for newObj but got %T", newObj)
 	}
 
 	oldNamespacelabel, ok := oldObj.(*labelsv1alpha1.NamespaceLabel)
 	if !ok {
-		return nil, fmt.Errorf("expected a NamespaceLabel object for the oldObj but got %T", oldObj)
+		return nil, fmt.Errorf("expected a NamespaceLabel object for oldObj but got %T", oldObj)
 	}
 
-	namespacelabellog.Info("Validation for NamespaceLabel upon update", "name", namespacelabel.GetName(), "namespace", namespacelabel.GetNamespace())
-
-	if err := v.validateName(namespacelabel); err != nil {
-		return nil, err
-	}
-
-	if err := v.validateSingleton(ctx, namespacelabel, oldNamespacelabel); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+	return v.validateNamespaceLabel(ctx, namespacelabel, oldNamespacelabel, "update")
 }
 
 // ValidateDelete implements webhook.CustomValidator.
