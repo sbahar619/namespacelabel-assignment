@@ -1,0 +1,15 @@
+apiVersion: labels.shahaf.com/v1alpha1
+kind: NamespaceLabel
+metadata:
+  labels:
+    app.kubernetes.io/name: namespacelabel
+    app.kubernetes.io/managed-by: kustomize
+  name: labels  # Singleton pattern: only one CR named "labels" allowed per namespace
+  namespace: default
+spec:
+  # Labels are applied to the same namespace as this CR (default) for security
+  labels:
+    environment: "development"
+    team: "platform"
+    app: "sample-app"
+    tier: "backend"
